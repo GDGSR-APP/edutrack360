@@ -8,8 +8,11 @@ de conversation de planification et repris ici dans ses points structurants.
 
 ## Decisions actees
 
-- **A1** - Aucun GRANT table pour `app_role`. Couche d'acces ecrite a la main,
-  fonctions/vues `security_invoker`. RLS forcee = seconde barriere.
+- **A1** - Aucun GRANT table pour `app_role`. Couche d'acces ecrite a la main.
+  CORRIGE EN PHASE 2, par preuve empirique (`docs/phase2/notes-phase2.md`) :
+  pas de vues `security_invoker` (ca exigerait un GRANT direct a app_role sur
+  la table de base, ce qui viole A1) - vues DEFINER-style (par defaut),
+  app_role n'a GRANT que sur les vues. RLS forcee = seconde barriere.
 - **A2** - Authentification OIDC contre Google Workspace, pas d'IdP
   auto-heberge. Verification serveur : emetteur, audience, expiration,
   signature, **puis revendication `hd`** comparee au domaine attendu (jamais

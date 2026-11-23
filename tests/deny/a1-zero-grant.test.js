@@ -20,11 +20,12 @@ afterAll(async () => {
 });
 
 describe("A1 - app_role sans aucun grant table", () => {
-  it("n'a aucun privilege sur aucune table du schema public", async () => {
+  it("n'a aucun privilege sur aucune TABLE DE BASE du schema public (les vues de la couche d'acces, Phase 2, sont attendues et exclues ici)", async () => {
     const { rows } = await superuser.query(`
-      SELECT table_name, privilege_type
-      FROM information_schema.table_privileges
-      WHERE grantee = 'app_role' AND table_schema = 'public'
+      SELECT tp.table_name, tp.privilege_type
+      FROM information_schema.table_privileges tp
+      JOIN pg_class c ON c.relname = tp.table_name AND c.relnamespace = 'public'::regnamespace
+      WHERE tp.grantee = 'app_role' AND tp.table_schema = 'public' AND c.relkind = 'r'
     `);
     expect(rows).toEqual([]);
   });

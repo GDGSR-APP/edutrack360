@@ -5,6 +5,8 @@
   "type": "commonjs",
   "scripts": {
     "test": "vitest run",
+    "lint": "eslint src",
+    "typecheck": "tsc",
     "migrate": "node-pg-migrate",
     "db:test:up": "docker compose -f infra/docker-compose.test.yml up -d --wait",
     "db:test:down": "docker compose -f infra/docker-compose.test.yml down -v"
@@ -13,8 +15,13 @@
     "pg": "8.23.1"
   },
   "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/pg": "^8.23.1",
+    "dotenv": "18.0.10",
+    "eslint": "^10.15.0",
     "node-pg-migrate": "9.0.0",
-    "vitest": "5.1.1",
-    "dotenv": "18.0.10"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.73.0",
+    "vitest": "5.1.1"
   }
 }

@@ -26,6 +26,10 @@ perimetres, referentiels) et le module notes en lecture seule.
   **brouillon**, non envoye.
 - [`docs/phase1/notes-phase1.md`](docs/phase1/notes-phase1.md) - ecart de
   sequence TDD signale pour la relecture Phase 6, non corrige retroactivement.
+- [`docs/phase2/notes-phase2.md`](docs/phase2/notes-phase2.md) - repli
+  TypeScript 5.x verifie, vues DEFINER-style (pas security_invoker, trouve
+  empiriquement), fuite RLS trouvee et corrigee, preuve d'execution de la
+  regle de lint.
 
 ## Garde-fous
 
