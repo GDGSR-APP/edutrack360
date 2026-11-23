@@ -24,6 +24,8 @@ perimetres, referentiels) et le module notes en lecture seule.
   **brouillon**, non envoye.
 - [`docs/phase0/signalement-etat-source.md`](docs/phase0/signalement-etat-source.md) -
   **brouillon**, non envoye.
+- [`docs/phase1/notes-phase1.md`](docs/phase1/notes-phase1.md) - ecart de
+  sequence TDD signale pour la relecture Phase 6, non corrige retroactivement.
 
 ## Garde-fous
 

@@ -51,6 +51,23 @@ service permanent), reseau Docker distinct (`reseau-etl`), seul composant a
 toucher les trois mondes (source, base applicative, correspondance) - detail
 dans `docs/architecture/topologie-reseau.md`.
 
+## Version PostgreSQL (tranchee en Phase 1, point 2)
+
+Base applicative : **PostgreSQL 17**, independante de la source (Supabase,
+PostgreSQL 15 - aucun lien de version entre les deux, l'ETL est en lecture
+seule et ne depend d'aucune fonctionnalite specifique a la version de la
+source).
+
+Verification de repli sur PostgreSQL 16 (si Coolify l'imposait) : les 6
+migrations de la Phase 1 ont ete executees **empiriquement**, sans
+modification, contre un conteneur PostgreSQL 16.15 ephemere - memes
+migrations, memes 7 tests de refus, 7/7 passes. Aucune fonctionnalite
+propre a la 17 n'est utilisee (`gen_random_uuid()` : core depuis PG13 ;
+`FORCE ROW LEVEL SECURITY` et `CREATE POLICY` : depuis PG9.5 ; le reste -
+`string_to_array`, `current_setting`, tableaux `uuid[]`, fonctions SQL
+`STABLE`, `GRANT`/`REVOKE` - est ancien et commun aux deux versions). La base
+applicative reste donc deployable en 16 sans changement si necessaire.
+
 ## Phases (0 a 10)
 
 0. Garde-fous, autorisations, signalement, topologie reseau - **en cours**.
