@@ -1,0 +1,20 @@
+#!/usr/bin/env sh
+# Phase 0 garde-fou : bloque un commit contenant un secret detecte par gitleaks.
+# Active par: git config core.hooksPath .githooks
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "AVERTISSEMENT: gitleaks n'est pas installe sur cette machine."
+  echo "Le scan de secrets local est DESACTIVE pour ce commit."
+  echo "Installez gitleaks (https://github.com/gitleaks/gitleaks) avant la mise en production."
+  exit 0
+fi
+
+gitleaks protect --staged --config .gitleaks.toml --redact
+status=$?
+
+if [ $status -ne 0 ]; then
+  echo "COMMIT BLOQUE: gitleaks a detecte un secret potentiel dans les changements proposes."
+  exit 1
+fi
+
+exit 0

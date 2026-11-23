@@ -1,0 +1,10 @@
+title = "EduTrack360 gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fichiers modeles sans valeurs reelles"
+paths = [
+  '''\.env\.example$''',
+]
