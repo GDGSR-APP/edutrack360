@@ -1,0 +1,14 @@
+services:
+  postgres-test:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: edutrack_super_test
+      POSTGRES_PASSWORD: edutrack_super_test_local_only
+      POSTGRES_DB: edutrack_test
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U edutrack_super_test -d edutrack_test"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
