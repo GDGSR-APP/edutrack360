@@ -6,9 +6,11 @@ existante, jamais modifiee par l'application. Portail pour directeurs
 d'unite et direction generale. Premier livrable : le socle (identites,
 perimetres, referentiels) et le module notes en lecture seule.
 
-**Statut : Phase 5 terminee** (sauvegarde, restauration testee hors
-production, retour arriere verifie pour les 12 migrations). Phases 0-4
-terminees et documentees (`docs/phase0/` a `docs/phase4/`).
+**Statut : Phase 5 terminee, dossier de Phase 6 pret** (sauvegarde,
+restauration testee hors production, retour arriere verifie pour les 12
+migrations ; dossier de relecture independante prepare, relecture
+elle-meme non commencee). Phases 0-4 terminees et documentees
+(`docs/phase0/` a `docs/phase4/`).
 
 ## Documentation
 
@@ -57,6 +59,11 @@ terminees et documentees (`docs/phase0/` a `docs/phase4/`).
   production testee (roles absents du dump, procedure corrigee, 90/90
   rejoue contre la base restauree) ; les 12 migrations annulees une par
   une sans erreur puis reconstruites.
+- [`docs/phase6/dossier-relecture-independante.md`](docs/phase6/dossier-relecture-independante.md) -
+  dossier prepare pour le relecteur independant (liste des fichiers avec
+  points de verification, trois points d'attention, controles en
+  attente, deux incidents de comportement, interdictions pour le
+  relecteur). La relecture elle-meme n'a pas encore eu lieu.
 
 ## Garde-fous
 
