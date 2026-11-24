@@ -53,7 +53,11 @@ tant que proprietaire, creer la toute premiere ligne d'un utilisateur sous
 `FORCE ROW LEVEL SECURITY` + `self_only` (l'identite n'existe pas encore
 au moment ou elle devrait se filtrer elle-meme). Son seul usage : etre
 proprietaire de la fonction `find_or_create_user` (migration 10). Detail
-empirique complet : `docs/phase3/notes-phase3.md`.
+empirique complet : `docs/phase3/notes-phase3.md`. Ecart d'architecture
+documente formellement : `docs/architecture/adr-0001-resolution-identite-premier-login.md`.
+Perimetre garanti par un meta-test permanent (detection depuis le
+catalogue, pas une liste ecrite a la main) :
+`tests/deny/meta-auth-bootstrap-owner-perimeter.test.js`.
 
 ## Hebergement
 

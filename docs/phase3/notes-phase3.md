@@ -306,3 +306,41 @@ etait bien le seul, et qu'il est desormais corrige dans
   teste contre un vrai compte Google (seul le faux IdP a tourne) ; le
   comportement SameSite des cookies n'a jamais ete verifie dans un
   navigateur reel (aucune route HTTP n'existe).
+
+## 9. Trois conditions du directeur de projet avant la Phase 4 - traitees
+
+**9a. Perimetre de `auth_bootstrap_owner` verifie.** Mesure directe par
+execution (`pg_class`/`pg_proc`/`pg_namespace`/`pg_auth_members`/`pg_roles`) :
+il possede exactement un objet (la fonction `find_or_create_user`, aucune
+table/vue/schema), n'a recu que `SELECT, INSERT, UPDATE` sur `users` et
+`EXECUTE` sur cette fonction, n'est membre d'aucun autre role, et ne porte
+aucun attribut de role dangereux au-dela de `BYPASSRLS` lui-meme
+(`rolsuper`/`rolcreaterole`/`rolcreatedb`/`rolcanlogin`/`rolreplication`
+tous faux). Exactement le perimetre voulu, rien de plus.
+
+**9b. Meta-test permanent.** `tests/deny/meta-auth-bootstrap-owner-perimeter.test.js`,
+meme methode que le meta-test des vues (Phase 2) : decouverte depuis le
+catalogue, fermeture par defaut. Preuve qu'il peut echouer : un `GRANT
+SELECT ON classes TO auth_bootstrap_owner` deliberement pose a fait
+echouer le test immediatement (diff exact affiche), revoque ensuite -
+7/7 de nouveau vert.
+
+**9c. ADR.** `docs/architecture/adr-0001-resolution-identite-premier-login.md` -
+premier ADR de ce projet, modele pour les ecarts suivants. Documente la
+decision approuvee au mot pres ("possedee par edutrack_schema_owner"),
+l'impossibilite mecanique reelle, et le remplacement exact avec son
+perimetre garanti.
+
+**Reponse au point 2 (referentiels globaux) : tranchee par le directeur de
+projet, pas par cette session.** Comportement accepte comme la bonne
+conception. En consequence, ajoute : `tests/auth/zero-grant-invariant.test.js`
+verifie desormais, par decouverte DYNAMIQUE des tables portant une colonne
+`student_code` (marqueur A5, pas une liste ecrite a la main), qu'un
+utilisateur sans aucun grant n'obtient ni ligne ni agregat - y compris un
+`COUNT(*) GROUP BY class_id` (effectif par classe) - sur `v_grades` et
+`v_student_averages`. Un verrou de coherence (`expect(tableNames).toEqual([...])`)
+fait echouer le test explicitement si le schema change sans qu'il soit
+revu, plutot que de continuer a "passer" sans plus rien verifier.
+
+`npx vitest run` : 64/64 sur 10 fichiers. `npx tsc` et `npx eslint src`
+silencieux.

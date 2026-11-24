@@ -203,15 +203,15 @@ describe("Invariant central : compte valide sans grant => aucune donnee", () => 
   });
 
   /*
-   * Question posee au directeur de projet, pas tranchee ici : les vues
-   * GLOBALES (v_units, v_levels, v_subjects) ne sont, par design, filtrees
-   * ni par unite ni par identite (docs/phase2/notes-phase2.md, categorie
-   * GLOBAL_VIEWS). Consequence mesuree : un utilisateur SANS AUCUN grant
-   * voit malgre tout les 18+ noms d'unites (et niveaux/matieres). Ce test
-   * ne fait qu'observer et figer ce fait par execution - il ne decide pas
-   * si c'est acceptable.
+   * Tranche par le directeur de projet (reponse au rapport de Phase 3) :
+   * acceptable, et c'est la bonne conception - noms d'ecoles, niveaux et
+   * matieres sont publics. Ce test fige ce comportement par execution.
+   * Ce qui doit rester strictement ferme (donnees d'eleves, effectifs,
+   * toute donnee nominative) est verifie separement ci-dessous, par
+   * decouverte dynamique plutot que par une liste de tables ecrite a la
+   * main (meme discipline que le meta-test des vues).
    */
-  it("observation (pas une decision) : un utilisateur sans aucun grant voit tout de meme les referentiels globaux (noms d'unites/niveaux/matieres)", async () => {
+  it("decision actee : un utilisateur sans aucun grant voit tout de meme les referentiels globaux (noms d'unites/niveaux/matieres)", async () => {
     await superuser.query(`DELETE FROM user_unit_grants WHERE user_id = $1`, [resolvedUserId]);
 
     const visible = await withAuthenticatedContext(resolvedUserId, async (c) => {
@@ -222,5 +222,66 @@ describe("Invariant central : compte valide sans grant => aucune donnee", () => 
     // sans grant. Si ce n'est pas le comportement souhaite, c'est une
     // decision produit a prendre, pas un bug de cette fonction.
     expect(visible.map((r) => r.id).sort()).toEqual([unitA, unitB].sort());
+  });
+
+  /*
+   * Demande explicite du directeur de projet, en reponse directe au point
+   * precedent : les tables/vues contenant des donnees d'eleves doivent
+   * rester strictement fermees pour un utilisateur sans grant, meme en
+   * agregat (aucun effectif, meme un simple COUNT). Decouverte dynamique
+   * des tables "donnees d'eleves" via la colonne student_code (marqueur
+   * A5 de donnee individualisee), pas une liste ecrite a la main - une
+   * future table avec cette colonne est couverte automatiquement.
+   */
+  it("fermeture stricte : aucune ligne ET aucun agregat (meme un COUNT ou un effectif par classe) sur les donnees d'eleves, pour un utilisateur sans grant", async () => {
+    await superuser.query(`DELETE FROM user_unit_grants WHERE user_id = $1`, [resolvedUserId]);
+
+    const studentDataTables = await superuser.query(`
+      SELECT col.table_name
+      FROM information_schema.columns col
+      JOIN information_schema.tables t
+        ON t.table_schema = col.table_schema AND t.table_name = col.table_name
+      WHERE col.table_schema = 'public'
+        AND col.column_name = 'student_code'
+        AND t.table_type = 'BASE TABLE'
+      ORDER BY 1
+    `);
+    const tableNames = studentDataTables.rows.map((r) => r.table_name);
+    // Verrou de coherence : si ce test cesse de trouver les deux tables
+    // connues, c'est que le schema a change sans que ce test ait ete
+    // revu - echec explicite plutot qu'un test qui ne verifie plus rien.
+    expect(tableNames).toEqual(["grades", "student_averages"]);
+
+    const exposedStudentViews = await superuser.query(`
+      SELECT DISTINCT c.relname AS view_name
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      JOIN information_schema.columns col
+        ON col.table_schema = 'public' AND col.table_name = c.relname AND col.column_name = 'student_code'
+      WHERE c.relkind = 'v'
+        AND n.nspname = 'public'
+        AND has_table_privilege('app_role', c.oid, 'SELECT')
+      ORDER BY 1
+    `);
+    const viewNames = exposedStudentViews.rows.map((r) => r.view_name);
+    expect(viewNames.sort()).toEqual(["v_grades", "v_student_averages"]);
+
+    for (const viewName of viewNames) {
+      const result = await withAuthenticatedContext(resolvedUserId, async (c) => {
+        const allRows = await c.query(`SELECT * FROM ${viewName}`);
+        const countRow = await c.query(`SELECT COUNT(*) AS n FROM ${viewName}`);
+        const perClass = await c.query(
+          `SELECT class_id, COUNT(*) AS n FROM ${viewName} GROUP BY class_id`
+        );
+        return { allRows: allRows.rows, count: Number(countRow.rows[0].n), perClass: perClass.rows };
+      });
+
+      expect(result.allRows, `${viewName} : aucune ligne attendue`).toEqual([]);
+      expect(result.count, `${viewName} : COUNT(*) doit etre 0, pas un agregat masque`).toBe(0);
+      expect(
+        result.perClass,
+        `${viewName} : aucun effectif par classe, meme agrege, ne doit apparaitre`
+      ).toEqual([]);
+    }
   });
 });

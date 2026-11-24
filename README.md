@@ -21,6 +21,9 @@ documentees (`docs/phase0/` a `docs/phase2/`).
   verification du domaine via la revendication `hd`.
 - [`docs/architecture/signal-accompagnement-et-fraicheur.md`](docs/architecture/signal-accompagnement-et-fraicheur.md) -
   seuils non codes en dur, date de fraicheur obligatoire.
+- [`docs/architecture/adr-0001-resolution-identite-premier-login.md`](docs/architecture/adr-0001-resolution-identite-premier-login.md) -
+  la decision approuvee (fonction possedee par edutrack_schema_owner)
+  s'est revelee impossible par execution ; ce qui la remplace et pourquoi.
 - [`docs/phase0/journal-questions-juridiques.md`](docs/phase0/journal-questions-juridiques.md) -
   questions loi 09-08 ouvertes, bloquent la production, pas le developpement.
 - [`docs/phase0/autorisation-etl-source-lecture.md`](docs/phase0/autorisation-etl-source-lecture.md) -
