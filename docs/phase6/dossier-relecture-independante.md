@@ -62,7 +62,7 @@ qui a des fichiers de nom different).
 |---|---|
 | `infra/bootstrap-roles.sql` | Les 6 roles crees (`edutrack_schema_owner`, `app_role`, `etl_loader_role`, `test_rls_probe`, `auth_bootstrap_owner`, `grants_admin_owner`). Verifier qu'aucun mot de passe n'y est en clair, que `auth_bootstrap_owner` et `grants_admin_owner` sont bien `NOLOGIN` (ne se connectent jamais directement). |
 | `infra/backup-database.sh`, `infra/restore-database.sh` | Scripts de sauvegarde/restauration (Phase 5). Verifier que les commentaires d'en-tete documentent bien les deux contraintes trouvees (sauvegarde = superutilisateur obligatoire ; restauration = les roles doivent exister avant). |
-| `eslint.config.js` | La regle interdisant d'importer `"pg"` hors de `src/data-access/**`. Verifier son perimetre exact (motif de fichiers couverts) - c'est le controle qui rend une requete SQL directe depuis le reste du code structurellement impossible, pas seulement deconseillee. |
+| `eslint.config.js` | La regle interdisant d'importer `"pg"` hors de `src/data-access/**`. C'est un FREIN contre le cas courant, pas une impossibilite structurelle (trouvaille de la relecture Phase 6, corrigee pour couvrir `require()`, `import()` dynamique, les sous-chemins et les fichiers hors `.ts`) - la garantie structurelle reelle est la combinaison GRANT+RLS au niveau base de donnees, independante de ce fichier. |
 
 ### Code applicatif (`src/`)
 

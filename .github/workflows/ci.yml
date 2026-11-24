@@ -15,3 +15,53 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
+
+  deny-and-auth-tests:
+    # Reponse directe au constat de la relecture Phase 6 : la suite
+    # tests/deny/* + tests/auth/* n'etait jamais executee par la CI,
+    # seulement lint/typecheck. Postgres ephemere demarre DANS ce job
+    # (meme image/roles que infra/docker-compose.test.yml et
+    # infra/bootstrap-roles.sql - jamais la base de production).
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: edutrack_super_test
+          POSTGRES_PASSWORD: edutrack_super_test_local_only
+          POSTGRES_DB: edutrack_test
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd="pg_isready -U edutrack_super_test -d edutrack_test"
+          --health-interval=2s --health-timeout=2s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+      - run: npm ci
+      - name: Installer le client psql (requis par infra/bootstrap-roles.sql - meta-commandes \gset/\if)
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Bootstrap des roles Postgres
+        env:
+          PGPASSWORD: edutrack_super_test_local_only
+        run: |
+          psql -h localhost -p 55432 -U edutrack_super_test -d edutrack_test \
+            -v schema_owner_password=schema_owner_local_only \
+            -v app_role_password=app_role_local_only \
+            -v etl_loader_role_password=etl_loader_local_only \
+            -v test_rls_probe_password=test_rls_probe_local_only \
+            -f infra/bootstrap-roles.sql
+      - name: Migrations
+        env:
+          DATABASE_URL: postgresql://edutrack_schema_owner:schema_owner_local_only@localhost:55432/edutrack_test
+        run: npx node-pg-migrate up
+      - name: tests/deny + tests/auth
+        env:
+          TEST_SUPERUSER_URL: postgresql://edutrack_super_test:edutrack_super_test_local_only@localhost:55432/edutrack_test
+          SCHEMA_OWNER_DATABASE_URL: postgresql://edutrack_schema_owner:schema_owner_local_only@localhost:55432/edutrack_test
+          APP_ROLE_DATABASE_URL: postgresql://app_role:app_role_local_only@localhost:55432/edutrack_test
+          ETL_LOADER_DATABASE_URL: postgresql://etl_loader_role:etl_loader_local_only@localhost:55432/edutrack_test
+          TEST_RLS_PROBE_DATABASE_URL: postgresql://test_rls_probe:test_rls_probe_local_only@localhost:55432/edutrack_test
+        run: npx vitest run tests/deny tests/auth

@@ -36,6 +36,28 @@ de conversation de planification et repris ici dans ses points structurants.
   `docs/architecture/signal-accompagnement-et-fraicheur.md`).
 - Fraicheur : date du dernier chargement ETL reussi visible sur toute page
   de donnees ETL.
+- **A7, A8, A9** - Trois exigences de produit du module notes, actees mais
+  **non implementees** (identifiees comme absentes du depot par la
+  relecture de Phase 6, `docs/phase6/rapport-relecture-phase6.md` point
+  f - omission du directeur de projet au moment de l'approbation initiale
+  du plan, pas une omission de la session de developpement). A construire
+  en Phase 8 (API + UI), avec leurs propres tests avant d'etre considerees
+  terminees :
+  - **A7 - Seuil de silence.** Un eleve dont le nombre d'evaluations
+    notees de la periode est inferieur au seuil configure n'apparait dans
+    aucune liste. L'ecran indique combien d'eleves ont ete ecartes pour
+    cette raison, sans les nommer. Le seuil vit dans la table de
+    configuration, par cycle, avec sa date de prise d'effet.
+  - **A8 - Refus d'etiqueter.** Aucun champ ne porte un nom qui qualifie
+    l'eleve. Un controle automatique parcourt le schema et echoue si un
+    tel nom apparait. La mention obligatoire (A6) est presente sur toute
+    page de classement, verifiee par un test.
+  - **A9 - Toute alerte cite ses elements.** Chaque ligne signalee donne
+    la regle declenchee, les notes qui l'ont declenchee avec leur
+    evaluation et leur matiere, le seuil applique et sa version. Aucune
+    alerte ne provient d'une table dont le mode de calcul n'est pas
+    documente. Un recalcul a partir des elements cites aboutit au meme
+    signalement.
 
 ## Roles Postgres (4 actes + 2 ajoutes en Phase 3/4, par necessite mecanique)
 

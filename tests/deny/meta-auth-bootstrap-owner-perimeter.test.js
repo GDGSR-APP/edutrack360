@@ -30,6 +30,13 @@ const EXPECTED_OWNED_FUNCTIONS = new Set(["find_or_create_user"]);
 const EXPECTED_OWNED_RELATIONS = new Set([]); // aucune table/vue
 const EXPECTED_TABLE_GRANTS = new Set(["users.SELECT", "users.INSERT", "users.UPDATE"]);
 const EXPECTED_ROUTINE_GRANTS = new Set(["find_or_create_user.EXECUTE"]);
+// Seul edutrack_schema_owner doit etre membre de auth_bootstrap_owner
+// (infra/bootstrap-roles.sql) - c'est ce qui lui permet d'ALTER OWNER la
+// fonction. Un AUTRE role rendu membre heriterait de BYPASSRLS - trouve
+// manquant par la relecture de Phase 6 (le test precedent ne verifiait
+// que ce dont auth_bootstrap_owner est membre, jamais qui est membre de
+// lui - la direction inverse).
+const EXPECTED_MEMBERS_OF_AUTH_BOOTSTRAP_OWNER = new Set(["edutrack_schema_owner"]);
 
 describe("Perimetre de auth_bootstrap_owner - jamais au-dela de l'amorcage find_or_create_user", () => {
   it("ne possede aucune table/vue/sequence/index - uniquement des fonctions", async () => {
@@ -91,6 +98,17 @@ describe("Perimetre de auth_bootstrap_owner - jamais au-dela de l'amorcage find_
       WHERE me.rolname = 'auth_bootstrap_owner'
     `);
     expect(rows).toEqual([]);
+  });
+
+  it("seul edutrack_schema_owner est membre de auth_bootstrap_owner (direction inverse, trouvee manquante par la relecture Phase 6)", async () => {
+    const { rows } = await superuser.query(`
+      SELECT me.rolname AS member
+      FROM pg_auth_members m
+      JOIN pg_roles r ON r.oid = m.roleid
+      JOIN pg_roles me ON me.oid = m.member
+      WHERE r.rolname = 'auth_bootstrap_owner'
+    `);
+    expect(new Set(rows.map((r) => r.member))).toEqual(EXPECTED_MEMBERS_OF_AUTH_BOOTSTRAP_OWNER);
   });
 
   it("n'a aucun attribut de role dangereux au-dela de BYPASSRLS (qui est la necessite connue et approuvee)", async () => {
