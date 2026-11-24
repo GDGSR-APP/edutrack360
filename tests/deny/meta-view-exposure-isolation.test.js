@@ -107,6 +107,30 @@ async function assertUnitIsolation(viewName, idA, idB, unitA) {
   expect(rows.map((r) => r.id)).not.toContain(idB);
 }
 
+/*
+ * Verification fonctionnelle generique pour une vue identity-scoped : pose
+ * app.current_user_id successivement sur idA puis idB, et exige dans
+ * chaque sens que seule la ligne de l'identite posee apparaisse - jamais
+ * celle de l'autre. Meme methode que assertUnitIsolation (fonctionnelle,
+ * pas une simple declaration), demandee explicitement pour la categorie
+ * self_only.
+ */
+async function assertIdentityIsolation(viewName, selectCol, idA, idB) {
+  const rowsAsA = await appRoleQuery(
+    `SET LOCAL app.current_user_id = '${idA}'`,
+    `SELECT ${selectCol} FROM ${viewName} WHERE ${selectCol} IN ($1, $2)`,
+    [idA, idB]
+  );
+  expect(rowsAsA.map((r) => r[selectCol])).toEqual([idA]);
+
+  const rowsAsB = await appRoleQuery(
+    `SET LOCAL app.current_user_id = '${idB}'`,
+    `SELECT ${selectCol} FROM ${viewName} WHERE ${selectCol} IN ($1, $2)`,
+    [idA, idB]
+  );
+  expect(rowsAsB.map((r) => r[selectCol])).toEqual([idB]);
+}
+
 describe("Meta-test : toute vue exposee a app_role est classifiee et verifiee", () => {
   let unitA, unitB, levelId, subjectId, classA, classB, periodA, periodB;
   let gradeA, gradeB, avgA, avgB;
@@ -218,13 +242,12 @@ describe("Meta-test : toute vue exposee a app_role est classifiee et verifiee", 
     await assertUnitIsolation("v_student_averages", avgA, avgB, unitA);
   });
 
-  it("v_my_profile isole par identite, pas par unite", async () => {
-    const rows = await appRoleQuery(
-      `SET LOCAL app.current_user_id = '${userA}'`,
-      `SELECT id FROM v_my_profile WHERE id IN ($1, $2)`,
-      [userA, userB]
-    );
-    expect(rows.map((r) => r.id)).toEqual([userA]);
+  it("v_my_profile isole par identite dans les deux sens : chaque utilisateur ne voit que sa propre ligne", async () => {
+    await assertIdentityIsolation("v_my_profile", "id", userA, userB);
+  });
+
+  it("v_my_unit_grants isole par identite dans les deux sens : aucun des deux ne voit les lignes de l'autre", async () => {
+    await assertIdentityIsolation("v_my_unit_grants", "user_id", userA, userB);
   });
 
   it("v_my_unit_grants isole par identite : un contexte d'unite pointant vers l'AUTRE unite ne fait pas fuiter la ligne de B", async () => {

@@ -24,6 +24,9 @@ perimetres, referentiels) et le module notes en lecture seule.
   **brouillon**, non envoye.
 - [`docs/phase0/signalement-etat-source.md`](docs/phase0/signalement-etat-source.md) -
   **brouillon**, non envoye.
+- [`docs/phase0/controles-en-attente.md`](docs/phase0/controles-en-attente.md) -
+  blocage de commit par gitleaks jamais declenche reellement (gitleaks non
+  installe) - controle en attente, pas invente comme demontre.
 - [`docs/phase1/notes-phase1.md`](docs/phase1/notes-phase1.md) - ecart de
   sequence TDD signale pour la relecture Phase 6, non corrige retroactivement.
 - [`docs/phase2/notes-phase2.md`](docs/phase2/notes-phase2.md) - repli

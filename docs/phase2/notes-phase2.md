@@ -383,3 +383,15 @@ invente). La vue fautive a ete supprimee (`DROP VIEW`) dans un bloc
 `finally`, donc jamais laissee dans le schema meme si l'assertion precedente
 echoue. Verifie par execution : `npx vitest run` passe a 20/20 sur les 5
 fichiers de `tests/deny/`, `npx tsc` et `npx eslint src` restent silencieux.
+
+**Addendum : la categorie `self_only` testee fonctionnellement, pas
+seulement declaree.** Remarque du directeur de projet, prise en compte :
+la premiere version ne testait `v_my_profile` que dans un seul sens (userA
+ne voit pas userB) et verifiait `v_my_unit_grants` surtout via le piege de
+contexte d'unite, sans prouver le sens symetrique de maniere explicite.
+Ajout de `assertIdentityIsolation(viewName, selectCol, idA, idB)`, meme
+methode que `assertUnitIsolation` : pose `app.current_user_id` sur idA puis
+sur idB tour a tour, exige dans chaque sens qu'aucune ligne de l'autre
+identite n'apparaisse. Appliquee aux deux vues identity-scoped
+(`v_my_profile`, `v_my_unit_grants`), le piege de contexte d'unite conserve
+en plus. `npx vitest run` passe desormais a 21/21.
