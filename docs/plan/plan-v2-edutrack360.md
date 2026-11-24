@@ -37,13 +37,23 @@ de conversation de planification et repris ici dans ses points structurants.
 - Fraicheur : date du dernier chargement ETL reussi visible sur toute page
   de donnees ETL.
 
-## Roles Postgres (4)
+## Roles Postgres (4 actes + 1 ajoute en Phase 3, par necessite mecanique)
 
 `edutrack_schema_owner` (possede tout, migrations DDL, jamais utilise par
 l'app en execution) / `app_role` (EXECUTE seul, aucun GRANT table, RLS
 forcee) / `etl_loader_role` (EXECUTE seul sur fonctions de chargement
 dediees) / `etl_source_reader_role` (SELECT seul sur la source, colonnes
 limitees A5, cree seulement apres autorisation ecrite).
+
+**5e role, `auth_bootstrap_owner`** (`NOLOGIN`, `BYPASSRLS`, jamais de mot
+de passe, n'apparait dans aucune chaine de connexion) : ajoute en Phase 3,
+pas prevu au moment de l'approbation du plan. Necessaire parce que
+`edutrack_schema_owner` n'a pas `BYPASSRLS` et ne peut donc pas, meme en
+tant que proprietaire, creer la toute premiere ligne d'un utilisateur sous
+`FORCE ROW LEVEL SECURITY` + `self_only` (l'identite n'existe pas encore
+au moment ou elle devrait se filtrer elle-meme). Son seul usage : etre
+proprietaire de la fonction `find_or_create_user` (migration 10). Detail
+empirique complet : `docs/phase3/notes-phase3.md`.
 
 ## Hebergement
 

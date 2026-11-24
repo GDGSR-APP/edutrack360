@@ -78,6 +78,32 @@ async function getViewsExposedToAppRole() {
   return rows.map((r) => r.view_name);
 }
 
+/*
+ * Extension Phase 3 : avant find_or_create_user (migration 10), app_role
+ * n'avait EXECUTE sur aucune fonction - ce controle n'avait donc rien a
+ * verifier. Meme methode de detection (droits reels, pas une liste ecrite
+ * a la main) appliquee aux fonctions : has_function_privilege.
+ */
+async function getFunctionsExposedToAppRole() {
+  const { rows } = await superuser.query(`
+    SELECT p.proname AS function_name
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND has_function_privilege('app_role', p.oid, 'EXECUTE')
+    ORDER BY 1
+  `);
+  return rows.map((r) => r.function_name);
+}
+
+// Justification par fonction - toute fonction exposee et absente d'ici fait
+// echouer le test (meme fermeture par defaut que pour les vues).
+const EXPOSED_FUNCTIONS = new Set([
+  "app_current_unit_ids", // STABLE, lit uniquement le GUC transaction-locale app.current_unit_ids, aucun acces table
+  "app_current_user_id", // STABLE, idem pour app.current_user_id
+  "find_or_create_user", // SECURITY DEFINER, perimetre teste en detail dans tests/deny/find-or-create-user.test.js (cree/retrouve par google_subject exact, ne touche jamais user_unit_grants)
+]);
+
 async function appRoleQuery(setupSql, sql, params) {
   const appRole = new Client({ connectionString: process.env.APP_ROLE_DATABASE_URL });
   await appRole.connect();
@@ -245,6 +271,18 @@ describe("Meta-test : toute vue exposee a app_role est classifiee et verifiee", 
     const exposed = new Set(await getViewsExposedToAppRole());
     const declared = [...UNIT_SCOPED_VIEWS, ...IDENTITY_SCOPED_VIEWS, ...GLOBAL_VIEWS];
     const stale = declared.filter((v) => !exposed.has(v));
+    expect(stale).toEqual([]);
+  });
+
+  it("toute fonction executable par app_role appartient a EXPOSED_FUNCTIONS (meme fermeture par defaut que pour les vues)", async () => {
+    const exposed = await getFunctionsExposedToAppRole();
+    const unclassified = exposed.filter((f) => !EXPOSED_FUNCTIONS.has(f));
+    expect(unclassified).toEqual([]);
+  });
+
+  it("aucune fonction declaree n'est obsolete : EXPOSED_FUNCTIONS ne contient que des fonctions reellement executables par app_role", async () => {
+    const exposed = new Set(await getFunctionsExposedToAppRole());
+    const stale = [...EXPOSED_FUNCTIONS].filter((f) => !exposed.has(f));
     expect(stale).toEqual([]);
   });
 

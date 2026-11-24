@@ -33,6 +33,10 @@ perimetres, referentiels) et le module notes en lecture seule.
   TypeScript 5.x verifie, vues DEFINER-style (pas security_invoker, trouve
   empiriquement), fuite RLS trouvee et corrigee, preuve d'execution de la
   regle de lint.
+- [`docs/phase3/notes-phase3.md`](docs/phase3/notes-phase3.md) - resolution
+  d'identite au premier login (find_or_create_user), trois echecs reels
+  empiles (self_only/BYPASSRLS, ALTER OWNER, grant table) corriges et
+  verifies par execution.
 
 ## Garde-fous
 

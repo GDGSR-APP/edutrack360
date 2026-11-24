@@ -50,3 +50,32 @@ SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'test_rls_probe') AS exist
 -- etl_source_reader_role n'est PAS cree ici : il vit sur la base SOURCE,
 -- pas sur la base applicative, et seulement apres l'autorisation ecrite
 -- (Phase 0, porte bloquante). Voir docs/phase0/autorisation-etl-source-lecture.md.
+
+-- Ajoute en Phase 3, suite a un echec reel (docs/phase3/notes-phase3.md) :
+-- edutrack_schema_owner n'a PAS BYPASSRLS, et FORCE ROW LEVEL SECURITY sur
+-- `users` s'applique donc aussi a lui. La fonction find_or_create_user
+-- (migration 10) doit pouvoir inserer un utilisateur qui n'existe pas
+-- encore - avant que app.current_user_id existe - ce que la policy
+-- self_only interdit structurellement, meme au proprietaire. Role NOLOGIN
+-- (ne se connecte jamais, n'apparait dans aucune chaine de connexion),
+-- BYPASSRLS, dont le seul usage est d'etre proprietaire de cette fonction.
+-- Aucun mot de passe : LOGIN non accorde.
+SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'auth_bootstrap_owner') AS exists \gset
+\if :exists
+  \echo 'auth_bootstrap_owner existe deja, ignore.'
+\else
+  CREATE ROLE auth_bootstrap_owner NOLOGIN BYPASSRLS;
+  GRANT auth_bootstrap_owner TO edutrack_schema_owner;
+\endif
+
+-- PG15+ restreint CREATE sur le schema public au proprietaire de la base par
+-- defaut - sans ceci, la toute premiere migration echoue avec "permission
+-- denied for schema public" (trouvaille empirique, Phase 1, jamais consignee
+-- ici jusqu'a present - gap corrige en Phase 3). GRANT est idempotent par
+-- nature, pas besoin de \if.
+-- auth_bootstrap_owner en a aussi besoin : ALTER FUNCTION ... OWNER TO exige
+-- que le NOUVEAU proprietaire ait CREATE sur le schema, pas seulement
+-- l'ancien (echec reproduit empiriquement en Phase 3, voir
+-- docs/phase3/notes-phase3.md).
+GRANT CREATE ON SCHEMA public TO edutrack_schema_owner;
+GRANT CREATE ON SCHEMA public TO auth_bootstrap_owner;
