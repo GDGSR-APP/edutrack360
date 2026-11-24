@@ -33,7 +33,7 @@ describe("Meta - RLS forcee sur toute table unit_id", () => {
     expect(rows).toEqual([]);
   });
 
-  it("confirme les tables attendues avec unit_id + RLS forcee (4 unit-scopees + user_unit_grants, qui porte aussi unit_id)", async () => {
+  it("confirme les tables attendues avec unit_id + RLS forcee (4 unit-scopees + user_unit_grants + grant_audit_log, Phase 4)", async () => {
     const { rows } = await superuser.query(`
       SELECT c.relname
       FROM pg_class c
@@ -45,6 +45,7 @@ describe("Meta - RLS forcee sur toute table unit_id", () => {
     expect(rows.map((r) => r.relname)).toEqual([
       "classes",
       "grades",
+      "grant_audit_log",
       "periods",
       "student_averages",
       "user_unit_grants",

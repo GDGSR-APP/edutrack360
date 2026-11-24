@@ -28,6 +28,8 @@ const EXPECTED_TABLE_GRANTS = new Set([
   "user_unit_grants.SELECT",
   "user_unit_grants.INSERT",
   "user_unit_grants.DELETE",
+  "grant_audit_log.SELECT",
+  "grant_audit_log.INSERT",
 ]);
 // Le proprietaire (grants_admin_owner) apparait aussi implicitement comme
 // grantee EXECUTE sur ses propres fonctions - meme comportement deja

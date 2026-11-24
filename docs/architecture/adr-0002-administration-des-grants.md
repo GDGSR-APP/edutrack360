@@ -1,8 +1,11 @@
 # ADR 0002 - Administration de user_unit_grants : A4 sans chemin d'execution reel
 
-**Statut** : EN ATTENTE DE CONFIRMATION (voir section "Clarification"
-ci-dessous) - PAS accepte de maniere verifiable a ce stade, malgre ce que
-ce document affirmait initialement. Suit le modele de l'ADR 0001.
+**Statut** : Accepte sur le fond, par un message de chat explicite et
+verifiable du directeur de projet (voir section "Confirmation explicite"
+ci-dessous) - APRES avoir ete construit sans cette approbation. Les deux
+faits (construit sans approbation, puis confirme sur le fond) sont
+consignes separement et ne se substituent pas l'un a l'autre. Suit le
+modele de l'ADR 0001.
 
 ## Contexte
 
@@ -132,13 +135,81 @@ le choix technique - qui constitue la faute : elle a retire au directeur
 de projet la possibilite de contester une decision avant qu'elle ne soit
 presentee comme actee.
 
-**Consequence sur le statut de cet ADR.** L'Option A (fonctions
-`grant_unit_access`/`revoke_unit_access`/`list_user_unit_grants`, role
-`grants_admin_owner`) reste en place dans le code - le directeur de
-projet indique explicitement que le choix technique est probablement
-correct et ne demande pas de retour en arriere. Mais son **statut
-d'approbation** est EN ATTENTE jusqu'a confirmation explicite et
-verifiable (un message de chat du directeur de projet), pas acquis sur la
-base du resultat d'outil seul. Consigne egalement dans
-`docs/phase0/controles-en-attente.md` pour la relecture independante de
+**Consequence sur le statut de cet ADR, au moment de la clarification.**
+L'Option A reste en place dans le code - le directeur de projet indique
+explicitement que le choix technique est probablement correct et ne
+demande pas de retour en arriere. Mais son **statut d'approbation** est
+alors EN ATTENTE jusqu'a confirmation explicite et verifiable (un message
+de chat du directeur de projet), pas acquis sur la base du resultat
+d'outil seul.
+
+## Confirmation explicite (message de chat, verifiable)
+
+Le directeur de projet a ensuite confirme, dans un message de chat
+explicite auquel ce document peut se referer :
+
+> "Je confirme la décision d'architecture de l'ADR 0002 : l'administration
+> des périmètres passe par trois fonctions dédiées (grant_unit_access,
+> revoke_unit_access, list_user_unit_grants), possédées par un rôle
+> grants_admin_owner distinct de auth_bootstrap_owner. Raison : chaque
+> octroi de périmètre passe par un point unique et traçable, au lieu
+> d'écritures libres dans la table, et le rôle d'amorçage ne devient pas
+> un rôle d'administration."
+
+Avec une precision explicite, qui ne doit pas etre effacee par cette
+confirmation : "Cette confirmation porte sur le fond. Elle ne rétablit
+pas l'attribution antérieure : au moment où tu l'as construite, elle
+n'était pas approuvée." Les deux faits restent donc consignes
+separement et de maniere permanente, y compris apres cette confirmation :
+
+1. L'Option A a ete construite et presentee comme approuvee AVANT toute
+   confirmation verifiable - fait constate dans la section
+   "Clarification" ci-dessus, non efface par ce qui suit.
+2. L'Option A est maintenant approuvee sur le fond, par ce message, pour
+   la raison donnee par le directeur de projet lui-meme (tracabilite par
+   point unique, separation du role d'amorcage).
+
+Consigne egalement dans `docs/phase0/controles-en-attente.md` (les deux
+faits, pas seulement la confirmation) pour la relecture independante de
 la Phase 6.
+
+## Deux exigences verifiees a la demande du directeur de projet
+
+**1. Tracabilite de chaque appel (qui, a qui, quelle unite, quand).**
+Trouve manquante par execution AVANT cette demande (`docs/phase4/notes-phase4.md`,
+section 2) : `grant_unit_access` n'alimentait jamais la colonne
+`granted_by` (presente depuis la migration 3, jamais utilisee), et
+`revoke_unit_access` faisait un `DELETE` pur qui detruit toute trace de
+ce qui a ete retire. Corrige (migration `20261124000012_grants_audit_trail.cjs`) :
+- `granted_by`/`granted_at` desormais renseignes sur la ligne active de
+  `user_unit_grants`, visibles via `list_user_unit_grants` (etendue).
+- Journal **append-only** `grant_audit_log` (`action`, `user_id`,
+  `unit_id`, `performed_by`, `performed_by_role`, `performed_at`) -
+  une ligne par appel, jamais modifiee ni supprimee par aucune fonction,
+  survit donc meme au retrait d'un acces. `performed_by_role` capture le
+  role Postgres reel automatiquement (`DEFAULT session_user`) ;
+  `performed_by` est une identite applicative optionnelle que l'operateur
+  peut fournir - limite honnete, documentee dans la migration : rien
+  n'oblige a la fournir, faute d'un systeme d'identite pour les operateurs
+  humains eux-memes.
+- Verifie par execution avec le role REEL (`edutrack_schema_owner`, pas
+  le superutilisateur de test) : octroi et retrait tracés correctement,
+  les deux visibles en relisant `grant_audit_log`.
+- RLS forcee ajoutee sur `grant_audit_log` par defense en profondeur
+  (trouve par le meta-test de Phase 1 qui s'applique correctement a une
+  table ajoutee en Phase 4).
+- Tests permanents : `tests/deny/grants-administration.test.js`.
+
+**2. `app_role` ne peut appeler aucune des 3 fonctions, seul le role
+prevu le peut.** Deja verifie avant cette demande (migration 11,
+`tests/deny/grants-administration.test.js`), reconfirme apres
+l'extension de signature (migration 12) : `permission denied for
+function` pour `app_role` sur les 3 fonctions et sur `grant_audit_log`
+directement ; `PUBLIC` n'a `EXECUTE` sur aucune des 3 ; seul
+`edutrack_schema_owner` (et le proprietaire `grants_admin_owner`
+lui-meme, implicitement) y a acces - garanti par
+`tests/deny/meta-grants-admin-owner-perimeter.test.js`, mis a jour pour
+couvrir le grant sur `grant_audit_log`.
+
+`npx vitest run` : 90/90 sur 13 fichiers, reconstruction complete depuis
+zero confirmee. `npx tsc` et `npx eslint src` silencieux.

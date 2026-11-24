@@ -6,10 +6,11 @@ existante, jamais modifiee par l'application. Portail pour directeurs
 d'unite et direction generale. Premier livrable : le socle (identites,
 perimetres, referentiels) et le module notes en lecture seule.
 
-**Statut : Phase 4 en cours** (identites et perimetres - matrice de refus
+**Statut : Phase 4 terminee** (identites et perimetres - matrice de refus
 livree ; administration des grants "a la main" dotee d'un chemin
-d'execution reel, ADR 0002). Phases 0-3 terminees et documentees
-(`docs/phase0/` a `docs/phase3/`).
+d'execution reel et d'un journal d'audit append-only, ADR 0002 confirme
+sur le fond). Phases 0-3 terminees et documentees (`docs/phase0/` a
+`docs/phase3/`).
 
 ## Documentation
 
@@ -25,9 +26,10 @@ d'execution reel, ADR 0002). Phases 0-3 terminees et documentees
   la decision approuvee (fonction possedee par edutrack_schema_owner)
   s'est revelee impossible par execution ; ce qui la remplace et pourquoi.
 - [`docs/architecture/adr-0002-administration-des-grants.md`](docs/architecture/adr-0002-administration-des-grants.md) -
-  meme cause mecanique que l'ADR 0001 ; grant_unit_access/revoke_unit_access.
-  **Statut d'approbation en attente** - attribution contestee par le
-  directeur de projet, voir la section "Clarification" du document.
+  meme cause mecanique que l'ADR 0001 ; grant_unit_access/revoke_unit_access,
+  avec journal d'audit append-only (grant_audit_log). Confirme sur le fond
+  par le directeur de projet - l'attribution initiale non verifiee reste
+  consignee separement (section "Confirmation explicite").
 - [`docs/phase0/journal-questions-juridiques.md`](docs/phase0/journal-questions-juridiques.md) -
   questions loi 09-08 ouvertes, bloquent la production, pas le developpement.
 - [`docs/phase0/autorisation-etl-source-lecture.md`](docs/phase0/autorisation-etl-source-lecture.md) -
@@ -44,8 +46,9 @@ d'execution reel, ADR 0002). Phases 0-3 terminees et documentees
   empiriquement), fuite RLS trouvee et corrigee, preuve d'execution de la
   regle de lint.
 - [`docs/phase4/notes-phase4.md`](docs/phase4/notes-phase4.md) - matrice de
-  refus par etat de perimetre livree ; A4 ("administre a la main") sans
-  chemin d'execution reel avec les roles actuels - decision en attente.
+  refus par etat de perimetre livree ; A4 ("administre a la main") dote
+  d'un chemin d'execution reel et d'un journal d'audit append-only
+  (ADR 0002, confirme sur le fond).
 - [`docs/phase3/notes-phase3.md`](docs/phase3/notes-phase3.md) - resolution
   d'identite au premier login (find_or_create_user), trois echecs reels
   empiles (self_only/BYPASSRLS, ALTER OWNER, grant table) corriges et
