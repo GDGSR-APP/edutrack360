@@ -297,3 +297,89 @@ GitHub Actions reel (`.github/workflows/ci.yml` existe mais n'a jamais
 tourne - pas de depot distant). Le critere "echoue en integration continue"
 est donc verifie dans son principe (meme commande, meme resultat attendu),
 pas encore sur l'infrastructure CI reelle.
+
+## 7. Meta-test de couverture des vues exposees - le controle manquant (0.1.d) construit
+
+Demande explicite du directeur de projet : construire, avant la Phase 3, le
+controle que la section 0.1.d ci-dessus identifiait comme absent - un
+meta-test qui parcourt les droits reels de `app_role` et echoue si une vue
+exposee n'applique pas le filtre d'unite. Fichier :
+`tests/deny/meta-view-exposure-isolation.test.js`.
+
+**Detection.** Pas de liste ecrite a la main pour savoir quelles vues sont
+exposees : requete sur `pg_class` + `has_table_privilege('app_role', oid,
+'SELECT')`. Une vue ajoutee demain et GRANTee par erreur apparait dans ce
+resultat sans qu'aucun fichier de test n'ait a etre modifie pour la voir.
+
+**Deux approches evaluees pour le critere de conformite, une retenue :**
+
+- *Structurelle* (lire `pg_get_viewdef`, chercher une reference a
+  `app_current_unit_ids()` dans le texte de la vue) - ecartee. Un motif de
+  texte ne prouve rien sur le comportement a l'execution : une vue peut
+  referencer la fonction sans que la policy sous-jacente s'applique
+  reellement (cas exact de la fuite migrations 7/8, qui aurait pu passer un
+  controle structurel naif puisque `unit_isolation_select` existait bel et
+  bien), et une ecriture SQL equivalente mais differente peut echapper a un
+  motif trop strict.
+- *Fonctionnelle* (retenue) - inserer des lignes dans deux unites (ou deux
+  identites) distinctes, interroger la vue via `app_role` avec un contexte
+  pose sur un seul cote, verifier qu'aucune ligne de l'autre cote
+  n'apparait. Prouve le comportement reellement observe, pas l'intention
+  lue dans le SQL. Limite assumee et non corrigee ici : ne couvre que les
+  chemins reellement executes par le test (toujours pas de protection contre
+  une vue materialisee, deja signale en 0.1.c).
+
+**Faisabilite des donnees a deux unites (demande du directeur de projet,
+point 3) : confirmee.** Le schema le permettait deja partiellement
+(`rls-policy-correctness.test.js` et `access-layer-views.test.js`
+l'utilisaient sur `classes` seule) ; ce fichier l'etend aux FK necessaires
+pour `grades` et `student_averages` (classe, periode, matiere par unite).
+
+**Ecart par rapport a la consigne initiale, signale et non corrige en
+silence.** La consigne demandait deux cas : colonne d'unite presente =>
+testee fonctionnellement ; colonne absente => doit etre declaree globale et
+justifiee. En classifiant les 11 vues reelles, `v_my_unit_grants` a revele
+un troisieme cas non prevu : elle **a** une colonne `unit_id`, mais n'est
+**pas** filtree par `app.current_unit_ids` - sa policy reelle (`self_only`
+sur `user_unit_grants`) filtre par `app.current_user_id`. Appliquer la
+regle "colonne unit_id => doit passer le test de contexte d'unite" telle
+que demandee aurait fait echouer cette vue a tort (poser un contexte
+d'unite ne change rien a ce qu'elle renvoie). Le test utilise donc trois
+categories declarees et justifiees (`UNIT_SCOPED_VIEWS`,
+`IDENTITY_SCOPED_VIEWS`, `GLOBAL_VIEWS`), pas deux, et la premiere assertion
+du fichier fait echouer le test si une vue exposee n'est dans aucune des
+trois - la fermeture par defaut demandee est donc preservee, seule la
+partition interne a change. Une seconde assertion verifie l'inverse (aucune
+vue declaree n'est absente des vues reellement exposees), pour detecter une
+declaration devenue obsolete si une vue est renommee ou supprimee.
+
+**Preuve d'echec sur une vue volontairement fautive.** Vue cree puis
+supprimee dans le corps du test (`CREATE VIEW v_fautive_classes AS SELECT
+id, unit_id, name FROM classes`, creee par le superutilisateur de test, qui
+a `BYPASSRLS`), avec `GRANT SELECT ... TO app_role`. Cette vue reproduit
+reellement la classe de bug visee : DEFINER-style sous un role qui
+contourne RLS integralement, donc `FORCE ROW LEVEL SECURITY` sur `classes`
+ne s'applique pas du tout a travers elle, quel que soit le contexte pose.
+Trois verifications sur cette vue, dans l'ordre :
+
+1. La detection par droits reels la voit (`has_table_privilege`) sans
+   qu'elle ait ete ecrite dans aucune liste.
+2. Elle n'est declaree dans aucune des 3 categories - le test de couverture
+   globale la ferait donc echouer.
+3. Le critere fonctionnel lui-meme la detecte independamment de la
+   classification : interrogee comme si elle etait unit-scoped, elle laisse
+   fuiter la ligne de l'unite B malgre un contexte pose sur l'unite A seule.
+
+Message d'echec exact obtenu au point 3 (Vitest, `expect(...).not.toContain(idB)`),
+copie tel qu'affiche par le terminal (Vitest tronque l'affichage du tableau
+en `…(2)`, ce n'est pas une omission de ma part) :
+
+```
+AssertionError: expected [ …(2) ] to not include '4652f6d6-e4be-466d-a4fb-ea24840f38ba'
+```
+
+(id exact de la fixture `classB` observe a l'execution ; reproductible, pas
+invente). La vue fautive a ete supprimee (`DROP VIEW`) dans un bloc
+`finally`, donc jamais laissee dans le schema meme si l'assertion precedente
+echoue. Verifie par execution : `npx vitest run` passe a 20/20 sur les 5
+fichiers de `tests/deny/`, `npx tsc` et `npx eslint src` restent silencieux.
