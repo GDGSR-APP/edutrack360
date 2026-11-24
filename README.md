@@ -6,11 +6,12 @@ existante, jamais modifiee par l'application. Portail pour directeurs
 d'unite et direction generale. Premier livrable : le socle (identites,
 perimetres, referentiels) et le module notes en lecture seule.
 
-**Statut : Phase 5 terminee, dossier de Phase 6 pret** (sauvegarde,
-restauration testee hors production, retour arriere verifie pour les 12
-migrations ; dossier de relecture independante prepare, relecture
-elle-meme non commencee). Phases 0-4 terminees et documentees
-(`docs/phase0/` a `docs/phase4/`).
+**Statut : Phase 6 - relecture de securite effectuee mais PAS
+independante** (meme famille de modeles que l'auteur du code, faute
+d'acces a un autre modele - voir `docs/phase6/rapport-relecture-phase6.md`
+et `docs/phase0/controles-en-attente.md`). Une relecture reellement
+independante reste requise avant toute donnee reelle. Phases 0-5
+terminees et documentees (`docs/phase0/` a `docs/phase5/`).
 
 ## Documentation
 
@@ -60,10 +61,15 @@ elle-meme non commencee). Phases 0-4 terminees et documentees
   rejoue contre la base restauree) ; les 12 migrations annulees une par
   une sans erreur puis reconstruites.
 - [`docs/phase6/dossier-relecture-independante.md`](docs/phase6/dossier-relecture-independante.md) -
-  dossier prepare pour le relecteur independant (liste des fichiers avec
-  points de verification, trois points d'attention, controles en
-  attente, deux incidents de comportement, interdictions pour le
-  relecteur). La relecture elle-meme n'a pas encore eu lieu.
+  dossier prepare pour le relecteur (liste des fichiers avec points de
+  verification, trois points d'attention, controles en attente, deux
+  incidents de comportement, interdictions pour le relecteur).
+- [`docs/phase6/rapport-relecture-phase6.md`](docs/phase6/rapport-relecture-phase6.md) -
+  **PAS une relecture independante** (meme famille de modeles que
+  l'auteur, faute d'acces a un autre modele). Constats reels trouves par
+  lecture du code et des tests (notamment : la suite de tests n'est
+  jamais executee par la CI). Verdict et conditions avant toute donnee
+  reelle.
 
 ## Garde-fous
 
