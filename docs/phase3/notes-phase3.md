@@ -133,7 +133,61 @@ declaree fait echouer le test).
 `npx vitest run` : 30/30 sur les 6 fichiers de `tests/deny/`. `npx tsc` et
 `npx eslint src` silencieux.
 
-## 4. Portee de ce qui suit (framework HTTP non tranche)
+## 4. openid-client ne verifie PAS la signature du jeton par defaut - trouvaille majeure
+
+En construisant la matrice de refus (`tests/auth/google-oidc.test.js`), le
+cas "signature invalide" (jeton signe avec une cle absente du JWKS publie)
+a d'abord **reussi a passer la verification** - c'est-a-dire que
+`verifyGoogleCallback` a accepte un jeton forge. Isole par execution (pas
+par lecture de code) : un script autonome confirme que `jose` lui-meme
+rejette correctement une signature croisee entre deux cles RSA
+(`jwtVerify` -> `signature verification failed`), donc le probleme n'etait
+pas dans la cryptographie, mais dans ce que `openid-client`
+verifie reellement par defaut.
+
+Documentation officielle de `enableNonRepudiationChecks()` (citee telle
+que recuperee via Context7) :
+
+> Validating signatures of JWTs received via direct communication between
+> the client and a TLS-secured endpoint (which it is here) is not
+> mandatory since the TLS server validation is used to validate the
+> issuer instead of checking the token signature. You only need to use
+> this method for non-repudiation purposes.
+
+Sur le flux Authorization Code (jeton recu directement du token endpoint,
+pas via un fragment d'URL), `openid-client` considere par defaut que le
+canal TLS authentifie deja l'emetteur et NE VERIFIE PAS la signature JWS
+du jeton d'identite. C'est un choix de conception documente et legitime en
+general - mais le plan de ce projet exige la verification de signature
+comme **controle explicite et independant**, pas une consequence
+indirecte de la confiance TLS (`docs/plan/plan-v2-edutrack360.md`, A2 :
+"verification serveur : emetteur, audience, expiration, signature").
+
+Corrige : `createGoogleOidcConfig` appelle desormais
+`client.enableNonRepudiationChecks` dans le tableau `execute` de la
+decouverte, systematiquement. Reverifie par execution : le meme cas de
+signature forgee echoue desormais (`tests/auth/google-oidc.test.js`,
+11/11). Sans cette trouvaille, la Phase 3 aurait livre une verification de
+signature qui n'en etait pas une dans ce mode d'usage - le code aurait eu
+l'air correct (il appelle bien une bibliotheque OIDC reputee) sans l'etre
+pour cette exigence precise.
+
+## 5. Cookies : deux scellements separes, pour une raison structurelle
+
+Documente dans `src/auth/session.ts`, resume ici : le cookie de session
+(apres login) est `sameSite=strict`. Le cookie du flux de login
+(code_verifier/state/nonce, pose avant la redirection vers Google) ne peut
+PAS etre `strict` - un navigateur ne renvoie pas un cookie `strict` sur la
+navigation de retour initiee par un tiers (Google) vers `/callback`. Ce
+cookie-ci est `sameSite=lax`, duree de vie courte (10 minutes), mot de
+passe de scellement different de celui du cookie de session - aucun des
+deux ne doit pouvoir se faire passer pour l'autre.
+
+Non verifie dans un navigateur reel a ce stade (aucune route HTTP n'existe
+encore - section 6). A verifier explicitement en Phase 8 avant de
+considerer le login termine.
+
+## 6. Portee de ce qui suit (framework HTTP non tranche)
 
 Le plan v2 n'a jamais explicitement choisi de framework HTTP (seule une
 comparaison incidentale de plancher Node avec Next.js existe dans la
@@ -146,3 +200,13 @@ scellement/descellement de session via les primitives bas niveau
 Next.js). Le cablage des routes HTTP concretes est reporte a la Phase 8,
 quand le framework sera choisi - note explicitement ici pour que la
 relecture de Phase 6 ne le prenne pas pour un oubli.
+
+## 7. Etat des tests a la fin de ce chantier
+
+`npx vitest run` : 43/43 sur 8 fichiers (`tests/deny/` x6,
+`tests/auth/google-oidc.test.js` matrice de refus 11/11,
+`tests/auth/zero-grant-invariant.test.js` invariant + bras de controle
+2/2). `npx tsc` et `npx eslint src` silencieux. `npm audit` sur
+`openid-client@6.9.1`, `jose@6.2.18`, `iron-session@9.1.1` : aucun nouvel
+avis (seuls les 3 avis moderes transitifs de `node-pg-migrate`, deja
+acceptes dans le plan, restent presents).

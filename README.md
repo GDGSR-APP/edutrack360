@@ -6,7 +6,10 @@ existante, jamais modifiee par l'application. Portail pour directeurs
 d'unite et direction generale. Premier livrable : le socle (identites,
 perimetres, referentiels) et le module notes en lecture seule.
 
-**Statut : Phase 0 en cours.** Aucun code applicatif n'existe encore.
+**Statut : Phase 3 en cours** (authentification Google Workspace OIDC -
+verification de jeton et resolution d'identite faites, cablage des routes
+HTTP reporte a la Phase 8, framework non choisi). Phases 0-2 terminees et
+documentees (`docs/phase0/` a `docs/phase2/`).
 
 ## Documentation
 
@@ -36,7 +39,8 @@ perimetres, referentiels) et le module notes en lecture seule.
 - [`docs/phase3/notes-phase3.md`](docs/phase3/notes-phase3.md) - resolution
   d'identite au premier login (find_or_create_user), trois echecs reels
   empiles (self_only/BYPASSRLS, ALTER OWNER, grant table) corriges et
-  verifies par execution.
+  verifies par execution ; openid-client ne verifie pas la signature du
+  jeton par defaut (TLS seul) - corrige par enableNonRepudiationChecks.
 
 ## Garde-fous
 

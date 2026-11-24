@@ -20,19 +20,31 @@ export function getPool(): Pool {
 }
 
 /*
- * Pose le contexte d'unites en TRANSACTION-LOCALE (SET LOCAL), jamais au
- * niveau session - une fuite via pooling de connexions sinon (risque
- * identifie dans le plan, section isolation).
+ * Pose le contexte en TRANSACTION-LOCALE (SET LOCAL), jamais au niveau
+ * session - une fuite via pooling de connexions sinon (risque identifie
+ * dans le plan, section isolation).
+ *
+ * L'ensemble d'unites n'est JAMAIS fourni par l'appelant (Phase 2->3,
+ * correction) : un appelant qui passerait des unitIds non valides serait
+ * l'autorisation elle-meme, ce qui la rend contournable par construction.
+ * Il est relu depuis v_my_unit_grants, dans la MEME transaction, apres
+ * avoir pose l'identite - l'invariant central de la Phase 3 (aucune ligne
+ * dans user_unit_grants => aucune donnee visible) decoule directement de
+ * ce mecanisme, pas d'une verification ajoutee a part.
  */
-export async function withUnitContext<T>(
-  unitIds: readonly string[],
+export async function withAuthenticatedContext<T>(
+  userId: string,
   run: (client: import("pg").PoolClient) => Promise<T>
 ): Promise<T> {
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
+    await client.query("SELECT set_config('app.current_user_id', $1, true)", [userId]);
+    const { rows } = await client.query<{ unit_id: string }>(
+      "SELECT unit_id FROM v_my_unit_grants"
+    );
     await client.query("SELECT set_config('app.current_unit_ids', $1, true)", [
-      unitIds.join(","),
+      rows.map((row) => row.unit_id).join(","),
     ]);
     const result = await run(client);
     await client.query("COMMIT");

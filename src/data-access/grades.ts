@@ -1,4 +1,4 @@
-import { withUnitContext } from "./db";
+import { withAuthenticatedContext } from "./db";
 
 export interface Grade {
   id: string;
@@ -16,15 +16,17 @@ export interface Grade {
  * applicatif. Interroge v_grades (vue, migration 9), jamais la table
  * grades directement - app_role n'a de toute facon aucun grant sur la
  * table de base (A1).
+ *
+ * Prend un userId, jamais une liste d'unites : l'appelant ne peut pas
+ * elargir son propre perimetre en passant un argument different -
+ * withAuthenticatedContext relit les unites autorisees depuis la base.
  */
-export async function getGradesForUnits(unitIds: readonly string[]): Promise<Grade[]> {
-  return withUnitContext(unitIds, async (client) => {
+export async function getGradesForUser(userId: string): Promise<Grade[]> {
+  return withAuthenticatedContext(userId, async (client) => {
     const { rows } = await client.query(
       `SELECT id, student_code, unit_id, class_id, subject_id, period_id,
               grade_value, grade_scale
-       FROM v_grades
-       WHERE unit_id = ANY($1)`,
-      [unitIds]
+       FROM v_grades`
     );
     return rows.map((row) => ({
       id: row.id,
