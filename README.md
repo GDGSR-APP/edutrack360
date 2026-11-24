@@ -6,10 +6,10 @@ existante, jamais modifiee par l'application. Portail pour directeurs
 d'unite et direction generale. Premier livrable : le socle (identites,
 perimetres, referentiels) et le module notes en lecture seule.
 
-**Statut : Phase 3 en cours** (authentification Google Workspace OIDC -
-verification de jeton et resolution d'identite faites, cablage des routes
-HTTP reporte a la Phase 8, framework non choisi). Phases 0-2 terminees et
-documentees (`docs/phase0/` a `docs/phase2/`).
+**Statut : Phase 4 en cours** (identites et perimetres - matrice de refus
+livree ; administration des grants "a la main" en attente d'une decision
+d'architecture, cf. `docs/phase4/notes-phase4.md`). Phases 0-3 terminees
+et documentees (`docs/phase0/` a `docs/phase3/`).
 
 ## Documentation
 
@@ -39,6 +39,9 @@ documentees (`docs/phase0/` a `docs/phase2/`).
   TypeScript 5.x verifie, vues DEFINER-style (pas security_invoker, trouve
   empiriquement), fuite RLS trouvee et corrigee, preuve d'execution de la
   regle de lint.
+- [`docs/phase4/notes-phase4.md`](docs/phase4/notes-phase4.md) - matrice de
+  refus par etat de perimetre livree ; A4 ("administre a la main") sans
+  chemin d'execution reel avec les roles actuels - decision en attente.
 - [`docs/phase3/notes-phase3.md`](docs/phase3/notes-phase3.md) - resolution
   d'identite au premier login (find_or_create_user), trois echecs reels
   empiles (self_only/BYPASSRLS, ALTER OWNER, grant table) corriges et
