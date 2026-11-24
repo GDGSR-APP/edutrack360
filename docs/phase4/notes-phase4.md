@@ -83,7 +83,45 @@ decision approuvee qui s'est reveleee irrealisable telle qu'ecrite).
   debut, et documenter cet acces (qui le detient, comment, avec quelle
   tracabilite) plutot que d'ajouter du code.
 
-Phase 4 s'arrete a ce point sur la question de l'administration - la
-matrice de refus (section 0) est livree et verifiee ; le mecanisme
-d'administration ne l'est pas, en attente de la decision du directeur de
-projet.
+## 2. Decision du directeur de projet : Option A (fonctions SECURITY DEFINER dediees)
+
+Mise en oeuvre (migration `20261124000011_grants_administration.cjs`,
+role `grants_admin_owner` dans `infra/bootstrap-roles.sql`) :
+
+- `grant_unit_access(p_user_id, p_unit_id)`, `revoke_unit_access(p_user_id, p_unit_id)`,
+  `list_user_unit_grants(p_user_id, p_unit_id)` (parametres optionnels -
+  seule visibilite possible sur l'etat courant, puisque meme `SELECT`
+  direct sur `user_unit_grants` est bloque par `self_only` pour
+  `edutrack_schema_owner`).
+- Possedees par un role DEDIE, `grants_admin_owner` (`NOLOGIN`,
+  `BYPASSRLS`) - explicitement PAS `auth_bootstrap_owner`, dont le
+  perimetre est deja garanti exact par son propre meta-test ; l'elargir
+  aurait rompu cette garantie juste actee.
+- `EXECUTE` accorde UNIQUEMENT a `edutrack_schema_owner`. Jamais a
+  `app_role` - verifie par execution avec le role reel (pas le
+  superutilisateur de test) : `permission denied for function
+  grant_unit_access` pour `app_role`, succes complet pour
+  `edutrack_schema_owner` (grant, lecture, retrait, idempotence dans les
+  deux sens).
+
+Les trois corrections mecaniques de l'ADR 0001 ont ete appliquees
+PREVENTIVEMENT cette fois (pas redecouvertes a chaud) : `search_path =
+''` + qualification `public.*`, `GRANT CREATE ON SCHEMA public` pour le
+nouveau role avant tout `ALTER FUNCTION ... OWNER TO`, et le `GRANT
+SELECT, INSERT, DELETE` explicite sur la table malgre `BYPASSRLS`. La
+migration est passee du premier coup.
+
+**Perimetre garanti par un meta-test permanent**
+(`tests/deny/meta-grants-admin-owner-perimeter.test.js`, meme methode que
+pour `auth_bootstrap_owner` - detection depuis le catalogue). Preuve qu'il
+peut echouer : un `GRANT EXECUTE ... TO app_role` deliberement pose sur
+`grant_unit_access` a fait echouer le test immediatement, revoque
+ensuite.
+
+**Reconstruction complete depuis zero** (down/up, bootstrap, migrate,
+rien a la main) : 84/84 sur 13 fichiers de test. `npx tsc` et `npx eslint
+src` silencieux.
+
+A4 a donc desormais un chemin d'execution reel et verifie - "administre a
+la main" signifie concretement : un operateur connecte en tant que
+`edutrack_schema_owner` appelle ces trois fonctions.

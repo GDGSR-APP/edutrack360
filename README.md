@@ -7,9 +7,9 @@ d'unite et direction generale. Premier livrable : le socle (identites,
 perimetres, referentiels) et le module notes en lecture seule.
 
 **Statut : Phase 4 en cours** (identites et perimetres - matrice de refus
-livree ; administration des grants "a la main" en attente d'une decision
-d'architecture, cf. `docs/phase4/notes-phase4.md`). Phases 0-3 terminees
-et documentees (`docs/phase0/` a `docs/phase3/`).
+livree ; administration des grants "a la main" dotee d'un chemin
+d'execution reel, ADR 0002). Phases 0-3 terminees et documentees
+(`docs/phase0/` a `docs/phase3/`).
 
 ## Documentation
 
@@ -24,6 +24,9 @@ et documentees (`docs/phase0/` a `docs/phase3/`).
 - [`docs/architecture/adr-0001-resolution-identite-premier-login.md`](docs/architecture/adr-0001-resolution-identite-premier-login.md) -
   la decision approuvee (fonction possedee par edutrack_schema_owner)
   s'est revelee impossible par execution ; ce qui la remplace et pourquoi.
+- [`docs/architecture/adr-0002-administration-des-grants.md`](docs/architecture/adr-0002-administration-des-grants.md) -
+  meme cause mecanique que l'ADR 0001 : A4 ("administre a la main")
+  n'avait aucun chemin d'execution reel ; grant_unit_access/revoke_unit_access.
 - [`docs/phase0/journal-questions-juridiques.md`](docs/phase0/journal-questions-juridiques.md) -
   questions loi 09-08 ouvertes, bloquent la production, pas le developpement.
 - [`docs/phase0/autorisation-etl-source-lecture.md`](docs/phase0/autorisation-etl-source-lecture.md) -

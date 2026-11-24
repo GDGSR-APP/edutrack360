@@ -79,3 +79,24 @@ SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'auth_bootstrap_owner') AS
 -- docs/phase3/notes-phase3.md).
 GRANT CREATE ON SCHEMA public TO edutrack_schema_owner;
 GRANT CREATE ON SCHEMA public TO auth_bootstrap_owner;
+
+-- Ajoute en Phase 4, meme cause mecanique que auth_bootstrap_owner
+-- (docs/phase4/notes-phase4.md) : edutrack_schema_owner n'a pas
+-- BYPASSRLS, donc FORCE ROW LEVEL SECURITY + self_only sur users ET
+-- user_unit_grants l'empeche d'administrer un grant pour un AUTRE
+-- utilisateur que lui-meme - "administre a la main" (A4) n'avait aucun
+-- chemin d'execution reel sans ceci. Role NOLOGIN, BYPASSRLS, dont le
+-- seul usage est de posseder grant_unit_access/revoke_unit_access/
+-- list_user_unit_grants (migration 11). PAS auth_bootstrap_owner : son
+-- perimetre est deja garanti exact par un meta-test permanent
+-- (tests/deny/meta-auth-bootstrap-owner-perimeter.test.js) - l'elargir
+-- romprait cette garantie.
+SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'grants_admin_owner') AS exists \gset
+\if :exists
+  \echo 'grants_admin_owner existe deja, ignore.'
+\else
+  CREATE ROLE grants_admin_owner NOLOGIN BYPASSRLS;
+  GRANT grants_admin_owner TO edutrack_schema_owner;
+\endif
+
+GRANT CREATE ON SCHEMA public TO grants_admin_owner;

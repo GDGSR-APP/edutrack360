@@ -37,7 +37,7 @@ de conversation de planification et repris ici dans ses points structurants.
 - Fraicheur : date du dernier chargement ETL reussi visible sur toute page
   de donnees ETL.
 
-## Roles Postgres (4 actes + 1 ajoute en Phase 3, par necessite mecanique)
+## Roles Postgres (4 actes + 2 ajoutes en Phase 3/4, par necessite mecanique)
 
 `edutrack_schema_owner` (possede tout, migrations DDL, jamais utilise par
 l'app en execution) / `app_role` (EXECUTE seul, aucun GRANT table, RLS
@@ -58,6 +58,17 @@ documente formellement : `docs/architecture/adr-0001-resolution-identite-premier
 Perimetre garanti par un meta-test permanent (detection depuis le
 catalogue, pas une liste ecrite a la main) :
 `tests/deny/meta-auth-bootstrap-owner-perimeter.test.js`.
+
+**6e role, `grants_admin_owner`** (`NOLOGIN`, `BYPASSRLS`) : ajoute en
+Phase 4, meme cause mecanique que le 5e - `edutrack_schema_owner` ne peut
+ni lire ni ecrire dans `user_unit_grants`/`users` pour un autre
+utilisateur que lui-meme, rendant A4 ("administre a la main")
+inexecutable tel qu'approuve. Possede exactement
+`grant_unit_access`/`revoke_unit_access`/`list_user_unit_grants`
+(migration 11), `EXECUTE` accorde uniquement a `edutrack_schema_owner` -
+jamais a `app_role`. Detail empirique : `docs/phase4/notes-phase4.md`.
+Ecart documente : `docs/architecture/adr-0002-administration-des-grants.md`.
+Perimetre garanti par `tests/deny/meta-grants-admin-owner-perimeter.test.js`.
 
 ## Hebergement
 
