@@ -90,4 +90,47 @@ describe("find_or_create_user - perimetre mesure par execution", () => {
     `);
     expect(rows).toEqual([]);
   });
+
+  /*
+   * Regression permanente pour une vraie vulnerabilite trouvee par
+   * execution (docs/phase3/notes-phase3.md) : avec SET search_path =
+   * public (version initiale), app_role pouvait creer une table
+   * temporaire nommee "users" et la fonction operait sur CELLE-CI au lieu
+   * de public.users - pg_temp est cherche avant tout schema explicite.
+   * Corrige par search_path VIDE + qualification explicite. Ce test
+   * reproduit l'attaque exacte et exige qu'elle echoue desormais.
+   */
+  it("refus : une table temporaire nommee users ne peut plus detourner find_or_create_user (search_path hijack)", async () => {
+    await appRole.query("BEGIN");
+    await appRole.query(
+      "CREATE TEMP TABLE users (id uuid, google_subject text, email text, display_name text)"
+    );
+    await appRole.query(
+      "INSERT INTO pg_temp.users (id, google_subject, email, display_name) VALUES (gen_random_uuid(), 'foctest-shadow', 'piege@foctest.test', 'Piege')"
+    );
+
+    const { rows } = await appRole.query(`SELECT find_or_create_user($1, $2, $3) AS id`, [
+      "foctest-shadow",
+      "reel@foctest.test",
+      "Reel",
+    ]);
+
+    const shadowRow = await appRole.query(
+      "SELECT email FROM pg_temp.users WHERE google_subject = 'foctest-shadow'"
+    );
+    // La ligne temporaire doit rester "piege@foctest.test" - la fonction ne
+    // doit jamais l'avoir lue ni modifiee.
+    expect(shadowRow.rows[0].email).toBe("piege@foctest.test");
+    await appRole.query("COMMIT");
+
+    try {
+      const realRow = await superuser.query(
+        "SELECT id, email FROM users WHERE google_subject = 'foctest-shadow'"
+      );
+      expect(realRow.rows[0].email).toBe("reel@foctest.test");
+      expect(rows[0].id).toBe(realRow.rows[0].id);
+    } finally {
+      await appRole.query("DROP TABLE IF EXISTS pg_temp.users");
+    }
+  });
 });

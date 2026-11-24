@@ -11,6 +11,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Client } from "pg";
+import { randomBytes } from "crypto";
 import * as client from "openid-client";
 import dotenv from "dotenv";
 dotenv.config({ path: ".env.test" });
@@ -18,17 +19,18 @@ dotenv.config({ path: ".env.test" });
 import { createGoogleOidcConfig, verifyGoogleCallback } from "../../src/auth/google-oidc.ts";
 import { findOrCreateUser } from "../../src/data-access/users.ts";
 import { getGradesForUser } from "../../src/data-access/grades.ts";
+import { withAuthenticatedContext } from "../../src/data-access/db.ts";
 import { startFakeGoogleIdp } from "./fake-google-idp.js";
 
 const ALLOWED_DOMAIN = "ecoles-test.ma";
-const CLIENT_ID = "test-client-id";
-const CLIENT_SECRET = "test-client-secret";
+const CLIENT_ID = `test-client-${randomBytes(8).toString("hex")}`;
+const CLIENT_SECRET = randomBytes(32).toString("hex");
 const REDIRECT_URI = "http://localhost/callback";
 
 let idp;
 let oidcConfig;
 let superuser;
-let unitA, unitB, levelId, subjectId, classA, classB, periodA, periodB, gradeA, gradeB;
+let unitA, unitB, levelId, subjectId, classA, classB, periodA, periodB, gradeA, gradeB, averageA, averageB;
 let resolvedUserId;
 
 beforeAll(async () => {
@@ -82,6 +84,16 @@ beforeAll(async () => {
   );
   gradeA = grades.rows.find((r) => r.unit_id === unitA).id;
   gradeB = grades.rows.find((r) => r.unit_id === unitB).id;
+
+  const averages = await superuser.query(
+    `INSERT INTO student_averages (student_code, unit_id, class_id, subject_id, period_id, average_value)
+     VALUES (gen_random_uuid(), $1, $3, $5, $6, 13),
+            (gen_random_uuid(), $2, $4, $5, $7, 8)
+     RETURNING id, unit_id`,
+    [unitA, unitB, classA, classB, subjectId, periodA, periodB]
+  );
+  averageA = averages.rows.find((r) => r.unit_id === unitA).id;
+  averageB = averages.rows.find((r) => r.unit_id === unitB).id;
 });
 
 afterAll(async () => {
@@ -89,6 +101,7 @@ afterAll(async () => {
     await superuser.query(`DELETE FROM user_unit_grants WHERE user_id = $1`, [resolvedUserId]);
     await superuser.query(`DELETE FROM users WHERE id = $1`, [resolvedUserId]);
   }
+  await superuser.query(`DELETE FROM student_averages WHERE id IN ($1, $2)`, [averageA, averageB]);
   await superuser.query(`DELETE FROM grades WHERE id IN ($1, $2)`, [gradeA, gradeB]);
   await superuser.query(`DELETE FROM periods WHERE id IN ($1, $2)`, [periodA, periodB]);
   await superuser.query(`DELETE FROM classes WHERE id IN ($1, $2)`, [classA, classB]);
@@ -150,5 +163,64 @@ describe("Invariant central : compte valide sans grant => aucune donnee", () => 
     const grades = await getGradesForUser(resolvedUserId);
     expect(grades.map((g) => g.id)).toEqual([gradeA]);
     expect(grades.map((g) => g.id)).not.toContain(gradeB);
+  });
+
+  /*
+   * L'affirmation "aucune donnee" ne portait jusqu'ici que sur v_grades.
+   * Etendu aux 3 autres vues unit-scoped (v_classes, v_periods,
+   * v_student_averages) dans les deux bras - sans quoi "0 ligne" ne
+   * prouvait l'isolation que pour une seule vue parmi quatre.
+   */
+  it("etendu : v_classes, v_periods, v_student_averages suivent le meme invariant (0 ligne sans grant, puis seulement unite A)", async () => {
+    // Retrait du grant precedent via le superuser (hors perimetre teste -
+    // app_role n'a de toute facon aucun grant table sur user_unit_grants, A1).
+    await superuser.query(`DELETE FROM user_unit_grants WHERE user_id = $1`, [resolvedUserId]);
+
+    const zeroGrant = await withAuthenticatedContext(resolvedUserId, async (c) => {
+      const classes = await c.query(`SELECT id FROM v_classes`);
+      const periods = await c.query(`SELECT id FROM v_periods`);
+      const averages = await c.query(`SELECT id FROM v_student_averages`);
+      return { classes: classes.rows, periods: periods.rows, averages: averages.rows };
+    });
+    expect(zeroGrant.classes).toEqual([]);
+    expect(zeroGrant.periods).toEqual([]);
+    expect(zeroGrant.averages).toEqual([]);
+
+    await superuser.query(`INSERT INTO user_unit_grants (user_id, unit_id) VALUES ($1, $2)`, [
+      resolvedUserId,
+      unitA,
+    ]);
+
+    const withGrant = await withAuthenticatedContext(resolvedUserId, async (c) => {
+      const classes = await c.query(`SELECT id FROM v_classes`);
+      const periods = await c.query(`SELECT id FROM v_periods`);
+      const averages = await c.query(`SELECT id FROM v_student_averages`);
+      return { classes: classes.rows, periods: periods.rows, averages: averages.rows };
+    });
+    expect(withGrant.classes.map((r) => r.id)).toEqual([classA]);
+    expect(withGrant.periods.map((r) => r.id)).toEqual([periodA]);
+    expect(withGrant.averages.map((r) => r.id)).toEqual([averageA]);
+  });
+
+  /*
+   * Question posee au directeur de projet, pas tranchee ici : les vues
+   * GLOBALES (v_units, v_levels, v_subjects) ne sont, par design, filtrees
+   * ni par unite ni par identite (docs/phase2/notes-phase2.md, categorie
+   * GLOBAL_VIEWS). Consequence mesuree : un utilisateur SANS AUCUN grant
+   * voit malgre tout les 18+ noms d'unites (et niveaux/matieres). Ce test
+   * ne fait qu'observer et figer ce fait par execution - il ne decide pas
+   * si c'est acceptable.
+   */
+  it("observation (pas une decision) : un utilisateur sans aucun grant voit tout de meme les referentiels globaux (noms d'unites/niveaux/matieres)", async () => {
+    await superuser.query(`DELETE FROM user_unit_grants WHERE user_id = $1`, [resolvedUserId]);
+
+    const visible = await withAuthenticatedContext(resolvedUserId, async (c) => {
+      const units = await c.query(`SELECT id FROM v_units WHERE id IN ($1, $2)`, [unitA, unitB]);
+      return units.rows;
+    });
+    // Documente le comportement reel : les deux unites sont visibles meme
+    // sans grant. Si ce n'est pas le comportement souhaite, c'est une
+    // decision produit a prendre, pas un bug de cette fonction.
+    expect(visible.map((r) => r.id).sort()).toEqual([unitA, unitB].sort());
   });
 });

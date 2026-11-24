@@ -12,6 +12,17 @@
 
 exports.up = (pgm) => {
   pgm.sql(`
+    -- Verifie empiriquement (docs/phase3/notes-phase3.md) : avec
+    -- SET search_path = public, un role sans privilege particulier (ex.
+    -- app_role lui-meme) peut CREATE TEMP TABLE users (...), GRANT ALL ON
+    -- users TO PUBLIC, et cette fonction SECURITY DEFINER se mettait a lire
+    -- et ecrire dans CETTE table temporaire au lieu de public.users -
+    -- pg_temp est cherche avant tout schema explicite, meme "public" seul.
+    -- Corrige par search_path VIDE + qualification explicite partout.
+    -- Egalement corrige au meme endroit : SELECT puis INSERT etait une
+    -- fenetre de course (deux premiers logins concurrents du meme
+    -- google_subject violeraient la contrainte UNIQUE) - remplace par un
+    -- INSERT ... ON CONFLICT atomique.
     CREATE FUNCTION find_or_create_user(
       p_google_subject text,
       p_email text,
@@ -20,19 +31,16 @@ exports.up = (pgm) => {
     RETURNS uuid
     LANGUAGE plpgsql
     SECURITY DEFINER
-    SET search_path = public
+    SET search_path = ''
     AS $$
     DECLARE
       v_id uuid;
     BEGIN
-      SELECT id INTO v_id FROM users WHERE google_subject = p_google_subject;
-      IF v_id IS NULL THEN
-        INSERT INTO users (google_subject, email, display_name)
-        VALUES (p_google_subject, p_email, p_display_name)
-        RETURNING id INTO v_id;
-      ELSE
-        UPDATE users SET email = p_email, display_name = p_display_name WHERE id = v_id;
-      END IF;
+      INSERT INTO public.users (google_subject, email, display_name)
+      VALUES (p_google_subject, p_email, p_display_name)
+      ON CONFLICT (google_subject) DO UPDATE
+        SET email = EXCLUDED.email, display_name = EXCLUDED.display_name
+      RETURNING id INTO v_id;
       RETURN v_id;
     END;
     $$;

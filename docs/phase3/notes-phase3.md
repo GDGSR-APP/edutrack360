@@ -201,7 +201,7 @@ Next.js). Le cablage des routes HTTP concretes est reporte a la Phase 8,
 quand le framework sera choisi - note explicitement ici pour que la
 relecture de Phase 6 ne le prenne pas pour un oubli.
 
-## 7. Etat des tests a la fin de ce chantier
+## 7. Etat des tests apres la premiere passe (avant relecture independante)
 
 `npx vitest run` : 43/43 sur 8 fichiers (`tests/deny/` x6,
 `tests/auth/google-oidc.test.js` matrice de refus 11/11,
@@ -210,3 +210,99 @@ relecture de Phase 6 ne le prenne pas pour un oubli.
 `openid-client@6.9.1`, `jose@6.2.18`, `iron-session@9.1.1` : aucun nouvel
 avis (seuls les 3 avis moderes transitifs de `node-pg-migrate`, deja
 acceptes dans le plan, restent presents).
+
+## 8. Relecture independante avant de clore ce chantier - trouvailles et corrections
+
+Une relecture independante (outil `advisor`) a ete demandee avant de
+rapporter la Phase 3 comme terminee. Elle a trouve une vraie
+vulnerabilite et plusieurs trous de couverture reels, pas des
+ameliorations cosmetiques.
+
+**8a. `find_or_create_user` etait vulnerable au detournement de
+`search_path` (table temporaire).** Reproduit par execution, pas suppose :
+en tant que `app_role`, `CREATE TEMP TABLE users (...)`, `GRANT ALL ON
+users TO PUBLIC`, puis `SELECT find_or_create_user(...)` - la fonction a
+lu et ECRIT dans cette table temporaire au lieu de `public.users` (elle a
+retourne l'id de la ligne temporaire et modifie son contenu). `SET
+search_path = public` cherche `pg_temp` AVANT tout schema explicite, meme
+quand "public" seul est demande. Corrige : `SET search_path = ''` + chaque
+reference qualifiee `public.users` explicitement. Reverifie par execution :
+la meme attaque echoue desormais, la vraie table `public.users` recoit la
+ligne, la table temporaire reste intacte (`tests/deny/find-or-create-user.test.js`,
+test permanent ajoute). Au meme endroit, le `SELECT` puis `INSERT` separes
+(fenetre de course entre deux premiers logins concurrents du meme
+`google_subject`) a ete remplace par un `INSERT ... ON CONFLICT ... DO
+UPDATE ... RETURNING id` atomique.
+
+**8b. `src/auth/session.ts` n'avait aucun test.** C'est pourtant l'une des
+exigences explicites du directeur de projet (cookie httpOnly/sameSite/secure,
+aucun jeton stocke). Ajoute : `tests/auth/session.test.js` (9 tests) -
+options de cookie des deux types, round-trip exact du contenu scelle,
+sceau altere/mauvais mot de passe/mauvais type de contenu redevenant
+`null` plutot qu'une erreur ou un id invente, separation stricte entre
+les deux mots de passe de scellement.
+
+**8c. Garde-fou HTTP non teste.** Ajoute : un test confirmant que
+`createGoogleOidcConfig` sans `allowInsecureDiscoveryForTestsOnly` rejette
+l'emetteur HTTP du faux IdP (le drapeau n'est pas actif par defaut).
+
+**8d. Verification par mutation de l'invariant central.** Le standard
+d'empirisme de ce depot (cf. la vue fautive en Phase 2) applique a notre
+propre test : `withAuthenticatedContext` a ete temporairement modifie pour
+lire les unites depuis `v_units` (toutes les unites) au lieu de
+`v_my_unit_grants`. Resultat : 3 des 4 tests du fichier ont echoue
+immediatement, avec des diffs montrant les vraies notes des deux unites
+apparaissant a tort. Revert, 56/56 a nouveau vert. Le test de l'invariant
+est donc prouve capable d'echouer, pas seulement observe en train de
+passer.
+
+**8e. L'invariant ne portait que sur `v_grades`.** Etendu a
+`v_classes`/`v_periods`/`v_student_averages` dans les deux bras (0 ligne
+sans grant, puis exactement l'unite A apres un grant).
+
+**8f. Question posee au directeur de projet, non tranchee ici.** Un
+utilisateur SANS AUCUN grant voit malgre tout les referentiels globaux
+(`v_units`, `v_levels`, `v_subjects` - noms des 18 ecoles, niveaux,
+matieres), par design de la categorie `GLOBAL_VIEWS` (Phase 2). Mesure par
+execution, pas decide : est-ce acceptable qu'un compte Google Workspace
+valide mais sans aucune affectation voie la liste des noms d'etablissements
+du reseau ? Si non, ces vues devraient devenir identity/unit-scoped ou
+retirees de ce qui est expose a `app_role` avant toute donnee reelle.
+
+**8g. Valeur de test non revue dans le depot.** `CLIENT_SECRET =
+"test-client-secret"` (litteral) remplace par
+`randomBytes(32).toString("hex")` dans les deux fichiers qui l'utilisaient
+- le faux IdP ne la valide pas, mais la regle du depot ne fait pas
+d'exception pour une valeur non exploitable non plus.
+
+**8h. Reconstruction complete depuis zero, sans aucune etape manuelle.**
+`npm run db:test:down` puis `up`, bootstrap des roles et migrations
+executes UNIQUEMENT via les scripts versionnes (aucune commande `GRANT`
+tapee a la main cette fois) : la 56/56 passe. Confirme que le gap
+decouvert en section 1 (GRANT CREATE ON SCHEMA public jamais versionne)
+etait bien le seul, et qu'il est desormais corrige dans
+`infra/bootstrap-roles.sql`.
+
+**8i. Dit ici, pas corrige :**
+- Le role `auth_bootstrap_owner` a ete approuve par le directeur de projet
+  sous la forme "fonction possedee par `edutrack_schema_owner`" - qui s'est
+  revelee impossible. Le role BYPASSRLS, les grants de table, et le GRANT
+  CREATE ajoutes sont une consequence mecanique, pas la decision initiale
+  telle qu'approuvee au mot pres. A faire reconnaitre explicitement par le
+  directeur de projet, pas juste a signaler en passant.
+- La frontiere de confiance de `withAuthenticatedContext` : elle fait
+  confiance au `userId` qu'on lui passe. Ce `userId` ne doit JAMAIS
+  provenir d'ailleurs que d'un sceau de session descellee avec succes -
+  aucune autre source n'est actuellement validee comme sure. Cette regle
+  n'est nulle part appliquee par du code (aucune route n'existe encore,
+  section 6) - seulement par convention, a surveiller en Phase 8.
+- CI (`.github/workflows/ci.yml`) ne lance toujours aucun test de base de
+  donnees - seulement lint/typecheck. Aucun des tests de ce chantier n'a
+  jamais tourne sur un runner reel.
+- Ecart de sequence TDD : la migration 10 et les modules d'authentification
+  ont ete ecrits avant leurs tests, comme en Phase 1 - signale, pas corrige
+  retroactivement.
+- Deux controles ajoutes a `docs/phase0/controles-en-attente.md` : jamais
+  teste contre un vrai compte Google (seul le faux IdP a tourne) ; le
+  comportement SameSite des cookies n'a jamais ete verifie dans un
+  navigateur reel (aucune route HTTP n'existe).

@@ -6,6 +6,7 @@
  * ce depot.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { randomBytes } from "crypto";
 import * as client from "openid-client";
 import {
   createGoogleOidcConfig,
@@ -15,8 +16,11 @@ import {
 import { startFakeGoogleIdp } from "./fake-google-idp.js";
 
 const ALLOWED_DOMAIN = "ecoles-test.ma";
-const CLIENT_ID = "test-client-id";
-const CLIENT_SECRET = "test-client-secret";
+const CLIENT_ID = `test-client-${randomBytes(8).toString("hex")}`;
+// Jamais une valeur litterale committee - le faux IdP ne la valide pas,
+// mais la regle du depot (A1/secrets) ne fait pas d'exception pour une
+// valeur non exploitable.
+const CLIENT_SECRET = randomBytes(32).toString("hex");
 const REDIRECT_URI = "http://localhost/callback";
 
 let idp;
@@ -79,6 +83,18 @@ async function runCallback({ claimsOverrides = {}, badSignature = false, expecte
     ALLOWED_DOMAIN
   );
 }
+
+describe("createGoogleOidcConfig - garde-fou HTTP", () => {
+  it("rejette un emetteur http:// sans allowInsecureDiscoveryForTestsOnly (le drapeau n'est pas un defaut implicite)", async () => {
+    await expect(
+      createGoogleOidcConfig({
+        issuer: idp.issuerUrl,
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+      })
+    ).rejects.toThrow();
+  });
+});
 
 describe("verifyGoogleCallback - cas valide", () => {
   it("accepte un jeton reellement valide et retourne l'identite derivee, sans jeton brut", async () => {
