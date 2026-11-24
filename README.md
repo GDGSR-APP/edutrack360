@@ -6,11 +6,9 @@ existante, jamais modifiee par l'application. Portail pour directeurs
 d'unite et direction generale. Premier livrable : le socle (identites,
 perimetres, referentiels) et le module notes en lecture seule.
 
-**Statut : Phase 4 terminee** (identites et perimetres - matrice de refus
-livree ; administration des grants "a la main" dotee d'un chemin
-d'execution reel et d'un journal d'audit append-only, ADR 0002 confirme
-sur le fond). Phases 0-3 terminees et documentees (`docs/phase0/` a
-`docs/phase3/`).
+**Statut : Phase 5 terminee** (sauvegarde, restauration testee hors
+production, retour arriere verifie pour les 12 migrations). Phases 0-4
+terminees et documentees (`docs/phase0/` a `docs/phase4/`).
 
 ## Documentation
 
@@ -54,6 +52,11 @@ sur le fond). Phases 0-3 terminees et documentees (`docs/phase0/` a
   empiles (self_only/BYPASSRLS, ALTER OWNER, grant table) corriges et
   verifies par execution ; openid-client ne verifie pas la signature du
   jeton par defaut (TLS seul) - corrige par enableNonRepudiationChecks.
+- [`docs/phase5/notes-phase5.md`](docs/phase5/notes-phase5.md) - sauvegarde
+  echoue bruyamment sans superutilisateur/BYPASSRLS ; restauration hors
+  production testee (roles absents du dump, procedure corrigee, 90/90
+  rejoue contre la base restauree) ; les 12 migrations annulees une par
+  une sans erreur puis reconstruites.
 
 ## Garde-fous
 

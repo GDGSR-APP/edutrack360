@@ -1,0 +1,14 @@
+services:
+  postgres-restore-verify:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: restore_verify_super
+      POSTGRES_PASSWORD: restore_verify_local_only
+      POSTGRES_DB: edutrack_restore_verify
+    ports:
+      - "55433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U restore_verify_super -d edutrack_restore_verify"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
