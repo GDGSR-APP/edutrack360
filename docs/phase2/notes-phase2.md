@@ -395,3 +395,47 @@ sur idB tour a tour, exige dans chaque sens qu'aucune ligne de l'autre
 identite n'apparaisse. Appliquee aux deux vues identity-scoped
 (`v_my_profile`, `v_my_unit_grants`), le piege de contexte d'unite conserve
 en plus. `npx vitest run` passe desormais a 21/21.
+
+**Second addendum : deux defauts reels trouves dans ce meme meta-test, APRES
+l'avoir annonce "verifie par execution".** Une relecture independante
+(outil `advisor`) a signale, avant le debut de la Phase 3, que la version
+21/21 ci-dessus avait deux problemes de fond, pas des details :
+
+1. `assertUnitIsolation` ne verifiait que `not.toContain(idB)`. Un resultat
+   VIDE (contexte casse, fixture jamais chargee) satisfait aussi
+   `not.toContain` - le test pouvait passer sans jamais prouver que idA
+   etait reellement visible. Corrige : assertion d'egalite stricte
+   `toEqual([idA])`, qui exige la presence reelle de idA en plus de
+   l'absence de idB.
+2. Les tests fonctionnels (`v_classes isole par unite`, etc.) etaient ecrits
+   a la main, un par vue, independamment du contenu de `UNIT_SCOPED_VIEWS`
+   / `IDENTITY_SCOPED_VIEWS`. Une vue ajoutee a l'un de ces Sets sans qu'on
+   pense a ecrire son `it()` aurait passe le test de classification (elle
+   est "declaree") sans jamais etre testee fonctionnellement - exactement
+   le trou que ce fichier pretendait combler. Corrige : les tests
+   fonctionnels sont maintenant GENERES par une boucle sur chaque Set
+   declare, avec un dictionnaire de fixtures (`unitScopedFixtures`,
+   `identityScopedFixtures`) ; une entree manquante fait `throw` une erreur
+   explicite au lieu de ne generer aucun test.
+
+Ajout egalement d'une verification inverse pour `GLOBAL_VIEWS` : chaque vue
+declaree globale est verifiee ne pas avoir de colonne `unit_id`
+(`information_schema.columns`), pour qu'une vue reellement unit-scoped mal
+classee ne passe pas silencieusement.
+
+Message d'echec exact sur la vue fautive, recapture apres ce changement
+(la formulation a change avec la nouvelle assertion `toEqual`, donc
+l'ancien message cite plus haut n'est plus celui que produirait le code
+actuel) :
+
+```
+expected [ …(2) ] to deeply equal [ Array(1) ]
+```
+
+`npx vitest run` passe a 22/22, `npx tsc` et `npx eslint src` restent
+silencieux. Lecon retenue, consignee sans l'adoucir : "verifie par
+execution" portait sur le resultat observe (le test passait), pas sur la
+question de savoir si le test lui-meme etait structurellement capable
+d'echouer dans tous les cas ou il aurait du. Les deux ne sont pas la meme
+chose, et la seconde n'a ete controlee qu'apres coup, par une relecture
+externe, pas par cette session elle-meme au moment de l'ecrire.

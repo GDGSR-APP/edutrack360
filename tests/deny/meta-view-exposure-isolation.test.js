@@ -104,7 +104,10 @@ async function assertUnitIsolation(viewName, idA, idB, unitA) {
     `SELECT id, unit_id FROM ${viewName} WHERE id IN ($1, $2)`,
     [idA, idB]
   );
-  expect(rows.map((r) => r.id)).not.toContain(idB);
+  // Egalite stricte, pas seulement "idB absent" : un resultat VIDE (contexte
+  // casse, fixture non chargee) ne doit pas passer ce test par defaut - idA
+  // doit etre reellement present.
+  expect(rows.map((r) => r.id)).toEqual([idA]);
 }
 
 /*
@@ -130,6 +133,17 @@ async function assertIdentityIsolation(viewName, selectCol, idA, idB) {
   );
   expect(rowsAsB.map((r) => r[selectCol])).toEqual([idB]);
 }
+
+/*
+ * Ces deux objets sont le seul endroit ou une vue declaree dans
+ * UNIT_SCOPED_VIEWS / IDENTITY_SCOPED_VIEWS doit fournir sa fixture. Les
+ * tests fonctionnels ci-dessous sont GENERES depuis les Sets declares, pas
+ * ecrits a la main par vue - une vue ajoutee a l'un des deux Sets sans
+ * entree ici fait echouer explicitement son test (throw), jamais passer
+ * silencieusement sans couverture.
+ */
+const unitScopedFixtures = {};
+const identityScopedFixtures = {};
 
 describe("Meta-test : toute vue exposee a app_role est classifiee et verifiee", () => {
   let unitA, unitB, levelId, subjectId, classA, classB, periodA, periodB;
@@ -197,6 +211,14 @@ describe("Meta-test : toute vue exposee a app_role est classifiee et verifiee", 
       `INSERT INTO user_unit_grants (user_id, unit_id) VALUES ($1, $3), ($2, $4)`,
       [userA, userB, unitA, unitB]
     );
+
+    unitScopedFixtures.v_classes = { idA: classA, idB: classB };
+    unitScopedFixtures.v_periods = { idA: periodA, idB: periodB };
+    unitScopedFixtures.v_grades = { idA: gradeA, idB: gradeB };
+    unitScopedFixtures.v_student_averages = { idA: avgA, idB: avgB };
+
+    identityScopedFixtures.v_my_profile = { selectCol: "id", idA: userA, idB: userB };
+    identityScopedFixtures.v_my_unit_grants = { selectCol: "user_id", idA: userA, idB: userB };
   });
 
   afterAll(async () => {
@@ -226,28 +248,38 @@ describe("Meta-test : toute vue exposee a app_role est classifiee et verifiee", 
     expect(stale).toEqual([]);
   });
 
-  it("v_classes isole par unite", async () => {
-    await assertUnitIsolation("v_classes", classA, classB, unitA);
-  });
+  for (const viewName of UNIT_SCOPED_VIEWS) {
+    it(`${viewName} isole par unite (test genere depuis UNIT_SCOPED_VIEWS)`, async () => {
+      const fixture = unitScopedFixtures[viewName];
+      if (!fixture) {
+        throw new Error(
+          `${viewName} est declaree dans UNIT_SCOPED_VIEWS mais aucune fixture n'a ete enregistree dans unitScopedFixtures - couverture manquante, pas seulement declaration manquante.`
+        );
+      }
+      await assertUnitIsolation(viewName, fixture.idA, fixture.idB, unitA);
+    });
+  }
 
-  it("v_periods isole par unite", async () => {
-    await assertUnitIsolation("v_periods", periodA, periodB, unitA);
-  });
+  for (const viewName of IDENTITY_SCOPED_VIEWS) {
+    it(`${viewName} isole par identite dans les deux sens (test genere depuis IDENTITY_SCOPED_VIEWS)`, async () => {
+      const fixture = identityScopedFixtures[viewName];
+      if (!fixture) {
+        throw new Error(
+          `${viewName} est declaree dans IDENTITY_SCOPED_VIEWS mais aucune fixture n'a ete enregistree dans identityScopedFixtures - couverture manquante, pas seulement declaration manquante.`
+        );
+      }
+      await assertIdentityIsolation(viewName, fixture.selectCol, fixture.idA, fixture.idB);
+    });
+  }
 
-  it("v_grades isole par unite", async () => {
-    await assertUnitIsolation("v_grades", gradeA, gradeB, unitA);
-  });
-
-  it("v_student_averages isole par unite", async () => {
-    await assertUnitIsolation("v_student_averages", avgA, avgB, unitA);
-  });
-
-  it("v_my_profile isole par identite dans les deux sens : chaque utilisateur ne voit que sa propre ligne", async () => {
-    await assertIdentityIsolation("v_my_profile", "id", userA, userB);
-  });
-
-  it("v_my_unit_grants isole par identite dans les deux sens : aucun des deux ne voit les lignes de l'autre", async () => {
-    await assertIdentityIsolation("v_my_unit_grants", "user_id", userA, userB);
+  it("vues declarees globales n'ont reellement aucune colonne unit_id (la declaration elle-meme est verifiee, pas juste lue)", async () => {
+    for (const viewName of GLOBAL_VIEWS) {
+      const { rows } = await superuser.query(
+        `SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 AND column_name = 'unit_id'`,
+        [viewName]
+      );
+      expect(rows, `${viewName} est declaree GLOBAL_VIEWS mais possede une colonne unit_id`).toEqual([]);
+    }
   });
 
   it("v_my_unit_grants isole par identite : un contexte d'unite pointant vers l'AUTRE unite ne fait pas fuiter la ligne de B", async () => {
@@ -302,7 +334,7 @@ describe("Meta-test : toute vue exposee a app_role est classifiee et verifiee", 
         caught = error;
       }
       expect(caught).toBeDefined();
-      expect(caught.message).toMatch(/expected .* to not include/i);
+      expect(caught.message).toMatch(/expected .* to (deeply equal|strictly equal)/i);
     } finally {
       await superuser.query(`REVOKE SELECT ON v_fautive_classes FROM app_role`);
       await superuser.query(`DROP VIEW v_fautive_classes`);
