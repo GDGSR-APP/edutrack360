@@ -25,8 +25,9 @@ d'execution reel, ADR 0002). Phases 0-3 terminees et documentees
   la decision approuvee (fonction possedee par edutrack_schema_owner)
   s'est revelee impossible par execution ; ce qui la remplace et pourquoi.
 - [`docs/architecture/adr-0002-administration-des-grants.md`](docs/architecture/adr-0002-administration-des-grants.md) -
-  meme cause mecanique que l'ADR 0001 : A4 ("administre a la main")
-  n'avait aucun chemin d'execution reel ; grant_unit_access/revoke_unit_access.
+  meme cause mecanique que l'ADR 0001 ; grant_unit_access/revoke_unit_access.
+  **Statut d'approbation en attente** - attribution contestee par le
+  directeur de projet, voir la section "Clarification" du document.
 - [`docs/phase0/journal-questions-juridiques.md`](docs/phase0/journal-questions-juridiques.md) -
   questions loi 09-08 ouvertes, bloquent la production, pas le developpement.
 - [`docs/phase0/autorisation-etl-source-lecture.md`](docs/phase0/autorisation-etl-source-lecture.md) -

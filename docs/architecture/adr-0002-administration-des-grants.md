@@ -1,7 +1,8 @@
 # ADR 0002 - Administration de user_unit_grants : A4 sans chemin d'execution reel
 
-**Statut** : Accepte (directeur de projet, Phase 4). Suit le modele de
-l'ADR 0001.
+**Statut** : EN ATTENTE DE CONFIRMATION (voir section "Clarification"
+ci-dessous) - PAS accepte de maniere verifiable a ce stade, malgre ce que
+ce document affirmait initialement. Suit le modele de l'ADR 0001.
 
 ## Contexte
 
@@ -99,3 +100,45 @@ laisser specifique a `find_or_create_user`.
   SECURITY` + `self_only` qui a besoin d'etre administree par un tiers
   rencontrera la meme impossibilite, et la meme solution (un role
   `BYPASSRLS` dedie et etroit, jamais un role existant elargi) s'applique.
+
+## Clarification demandee par le directeur de projet - a consigner sans l'adoucir
+
+Ce document affirmait initialement "**Statut** : Accepte (directeur de
+projet, Phase 4)" pour l'Option A. Le directeur de projet a conteste
+cette attribution, n'ayant retrouve ni la question ni sa reponse, et a
+demande une reponse precise, sans reconstruction a posteriori.
+
+**Fait exact, sans interpretation.** Aucune question n'a ete posee par
+message de chat. L'outil `AskUserQuestion` a ete appele avec la question
+suivante : "Comment administrer reellement user_unit_grants (et users),
+etant donne que edutrack_schema_owner est bloque par self_only + FORCE
+RLS exactement comme find_or_create_user l'etait avant l'ADR 0001 ?",
+deux options ("Fonctions SECURITY DEFINER dediees (recommande)" /
+"Acces superutilisateur Postgres direct documente"). L'outil a retourne
+le resultat suivant : "Your questions have been answered: [...]
+=\"Fonctions SECURITY DEFINER dediees (recommande)\"." Cette session n'a
+aucun moyen de verifier, au-dela de ce resultat d'outil, ce qui s'est
+reellement passe du cote de l'interface du directeur de projet.
+
+**Ce que cela signifie.** Ni le cas "question posee et repondue en
+chat" ni le cas "decide seul en silence et presente comme approuve" ne
+decrit exactement la situation. Un mecanisme structure a ete utilise
+(ce n'est pas une decision inventee de toutes pieces par cette session),
+mais son resultat a ensuite ete formule en chat ("Vous avez choisi
+l'option A") comme une approbation ferme et verifiable, alors qu'elle ne
+l'etait pas de maniere que le directeur de projet puisse la retrouver et
+la contester. C'est cette formulation - pas le mecanisme lui-meme, et pas
+le choix technique - qui constitue la faute : elle a retire au directeur
+de projet la possibilite de contester une decision avant qu'elle ne soit
+presentee comme actee.
+
+**Consequence sur le statut de cet ADR.** L'Option A (fonctions
+`grant_unit_access`/`revoke_unit_access`/`list_user_unit_grants`, role
+`grants_admin_owner`) reste en place dans le code - le directeur de
+projet indique explicitement que le choix technique est probablement
+correct et ne demande pas de retour en arriere. Mais son **statut
+d'approbation** est EN ATTENTE jusqu'a confirmation explicite et
+verifiable (un message de chat du directeur de projet), pas acquis sur la
+base du resultat d'outil seul. Consigne egalement dans
+`docs/phase0/controles-en-attente.md` pour la relecture independante de
+la Phase 6.

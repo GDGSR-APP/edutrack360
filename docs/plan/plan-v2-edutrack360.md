@@ -67,8 +67,11 @@ inexecutable tel qu'approuve. Possede exactement
 `grant_unit_access`/`revoke_unit_access`/`list_user_unit_grants`
 (migration 11), `EXECUTE` accorde uniquement a `edutrack_schema_owner` -
 jamais a `app_role`. Detail empirique : `docs/phase4/notes-phase4.md`.
-Ecart documente : `docs/architecture/adr-0002-administration-des-grants.md`.
-Perimetre garanti par `tests/deny/meta-grants-admin-owner-perimeter.test.js`.
+Ecart documente : `docs/architecture/adr-0002-administration-des-grants.md`
+(statut d'approbation EN ATTENTE - attribution contestee par le directeur
+de projet, voir la section "Clarification" du document ; le choix
+technique lui-meme n'est pas conteste). Perimetre garanti par
+`tests/deny/meta-grants-admin-owner-perimeter.test.js`.
 
 ## Hebergement
 
